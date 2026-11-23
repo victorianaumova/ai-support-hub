@@ -76,12 +76,15 @@ jobs:
           DATABASE_URL: ${{ secrets.NEON_OWNER_URL }}
         run: uv run alembic -c infra/alembic.ini upgrade head
 
+      # Its own runtime account (owner decision on PR 68): it reads mcp-server-token and nothing
+      # else; the default compute account is not used.
       - name: Deploy the MCP server (authentication required)
         env:
           TAG: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           gcloud run deploy support-tools --project "$PROJECT" --region "$REGION" \
             --image "$REGISTRY/support-tools:$TAG" --no-allow-unauthenticated \
+            --service-account "support-tools@$PROJECT.iam.gserviceaccount.com" \
             --min-instances 0 --max-instances 1 --cpu 1 --memory 512Mi \
             --set-secrets MCP_SERVER_TOKEN=mcp-server-token:latest --quiet
 
