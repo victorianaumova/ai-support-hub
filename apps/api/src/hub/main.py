@@ -26,6 +26,7 @@ from hub.api.privacy import admin_router as privacy_admin_router
 from hub.api.privacy import public_router as privacy_router
 from hub.api.security_headers import SecurityHeadersMiddleware
 from hub.api.tickets import router as tickets_router
+from hub.api.web import mount_web
 from hub.config import load_settings
 from hub.deps import Container, build_container
 from hub.graph.build import compile_graph
@@ -96,4 +97,7 @@ def create_app(container: Container | None = None) -> FastAPI:
     app.include_router(admin_settings_router)
     app.include_router(privacy_router)
     app.include_router(privacy_admin_router)
+    # Last: its catch-all route must not hide an API route.
+    if container.settings.web_dist_dir is not None:
+        mount_web(app, container.settings.web_dist_dir)
     return app

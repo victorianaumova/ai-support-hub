@@ -1,5 +1,6 @@
 # Local stack (docs/operations.md §1). `make up` starts it, `make down` stops it.
-# Service that comes later: `web` (Vite dev server, phase 10).
+# The web app runs on the host in development (`pnpm -C apps/web dev`); infra/compose.prod.yml
+# is the single-host production stack (P10-06).
 #
 # hub:hub and hub_api:hub_api are local defaults only, never real credentials. Every port binds to 127.0.0.1, so
 # nothing is reachable from the network. The image tags are also used by the testcontainers
@@ -53,6 +54,7 @@ services:
     build:
       context: ..
       dockerfile: infra/Dockerfile.api
+      target: dev
     # `.env` gives the settings; the URLs below point at the compose services instead of localhost.
     env_file:
       - path: ../.env
@@ -111,6 +113,7 @@ services:
     build:
       context: ..
       dockerfile: infra/Dockerfile.mcp
+      target: dev
     # The server reads only MCP_SERVER_TOKEN and CORE_ANCHOR_DATE from it (support_tools.server).
     env_file:
       - path: ../.env

@@ -1,0 +1,146 @@
+# Single-host production stack (operations §6, the fallback to Cloud Run; P10-06), from the repo root:
+#   docker compose --env-file .env -f infra/compose.prod.yml up --build
+# (from infra/: `--env-file ../.env`). `--env-file` is required: the ${...} values below are filled
+# in by compose from the shell or that file, NOT from `env_file:` (which only sets a container's
+# environment) and not from the repo-root .env by default. Without it the database URL falls back
+# to the password `hub` while Postgres gets the real one from env_file, and setup fails.
+# Secrets in .env (POSTGRES_PASSWORD is required): SESSION_SECRET, DEMO_ACCESS_CODE, JOBS_TOKEN,
+# MCP_SERVER_TOKEN, SEED_OPERATOR_PASSWORD, ANTHROPIC_API_KEY; nothing is baked into an image.
+#
+# Ports: only Caddy publishes ports. The default (no SITE_ADDRESS) is plain HTTP for a local check
+# on http://localhost:${HTTP_PORT:-8080}. For a real domain set SITE_ADDRESS=hub.example.com,
+# HTTP_PORT=80 and HTTPS_PORT=443, and point the domain's DNS at the host: Caddy needs both ports
+# reachable to get the certificate (ACME HTTP-01 / TLS-ALPN) and to redirect HTTP to HTTPS.
+#
+# TODO(P10-07): the app role `hub_api` still has the init script's password `hub_api`
+# (infra/postgres/init/02-app-user.sql), hardcoded in DATABASE_URL below. Postgres is not
+# published, but on a real host set it from a secret: ALTER ROLE hub_api PASSWORD ..., and
+# DATABASE_URL from .env / Secret Manager.
+name: support-hub-prod
+
+x-hub-env: &hub-env
+  env_file:
+    - path: ../.env
+      required: false
+  environment:
+    # TODO(P10-07): app role password from a secret (see the header).
+    DATABASE_URL: postgresql+psycopg://hub_api:hub_api@postgres:5432/hub
+    DATABASE_URL_DIRECT: postgresql+psycopg://hub:${POSTGRES_PASSWORD:-hub}@postgres:5432/hub
+    EVAL_DATABASE_URL: ""
+    QDRANT_URL: http://qdrant:6333
+    MCP_SERVER_URL: http://mcp:8001/mcp
+    # The production budget guard (owner decision, operations §6).
+    DAILY_BUDGET_USD: ${DAILY_BUDGET_USD:-0.20}
+    LLM_MODE: ${LLM_MODE:-real}
+    # The auto-reply lock (security G5, ADR-0019): a literal, so no .env can switch it on.
+    AUTO_REPLY_ALLOWED: "false"
+    # Only Caddy talks to the API; it sets X-Forwarded-For.
+    FORWARDED_ALLOW_IPS: "*"
+
+services:
+  postgres:
+    image: postgres:17.12-alpine
+    # POSTGRES_PASSWORD comes from .env; `environment` would override it, so it is not repeated here.
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      POSTGRES_USER: hub
+      POSTGRES_DB: hub
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --host 127.0.0.1 --username hub --dbname hub"]
+      start_period: 60s
+      start_interval: 2s
+      interval: 30s
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.20.0
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - exec 3<>/dev/tcp/127.0.0.1/6333 && printf 'GET /readyz HTTP/1.0\r\n\r\n' >&3 && head -n 1 <&3 | grep -q ' 200 '
+      start_period: 60s
+      start_interval: 2s
+      interval: 30s
+    restart: unless-stopped
+
+  mcp:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.mcp
+      target: prod
+    env_file:
+      - path: ../.env
+        required: false
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import urllib.error, urllib.request
+          try:
+              urllib.request.urlopen('http://127.0.0.1:8001/mcp', timeout=2)
+          except urllib.error.HTTPError as e:
+              raise SystemExit(e.code != 401)
+      start_period: 30s
+      start_interval: 2s
+      interval: 30s
+    restart: unless-stopped
+
+  # One-shot: migrations as the schema owner, then demo data and the knowledge base (idempotent).
+  setup:
+    build: &api-build
+      context: ..
+      dockerfile: infra/Dockerfile.api
+      target: prod
+    <<: *hub-env
+    command:
+      - sh
+      - -c
+      - alembic -c infra/alembic.ini upgrade head && python -m hub.seed data/seed && python -m hub.kb.service data/kb
+    depends_on:
+      postgres: {condition: service_healthy}
+      qdrant: {condition: service_healthy}
+
+  api:
+    build: *api-build
+    <<: *hub-env
+    depends_on:
+      setup: {condition: service_completed_successfully}
+      mcp: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      start_period: 60s
+      start_interval: 2s
+      interval: 30s
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.11.8-alpine
+    # SITE_ADDRESS comes from .env; the Caddyfile defaults it to `:80` (plain HTTP).
+    env_file:
+      - path: ../.env
+        required: false
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  qdrant-data:
+  caddy-data:

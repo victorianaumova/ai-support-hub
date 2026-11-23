@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1
-# Dev image for the `mcp` service of infra/docker-compose.yml (support-tools MCP server, P7-01).
-# Dependencies are baked in; compose mounts the source and the seed data. The production image is
-# written in phase 10 (docs/operations.md §6).
-FROM python:3.13.18-slim-trixie
+# The support-tools MCP server (P7-01). Targets:
+#   dev  — the `mcp` service of infra/docker-compose.yml: compose mounts the source and the seed.
+#   prod — the deployable image (default target): the package installed, the seed data copied,
+#          non-root (P10-06).
+FROM python:3.13.18-slim-trixie AS base
 
 # Keep equal to UV_VERSION in .github/workflows/ci.yml.
 COPY --from=ghcr.io/astral-sh/uv:0.11.8 /uv /usr/local/bin/uv
@@ -25,14 +26,33 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --package support-tools --no-install-workspace
 
 COPY apps/mcp_server/src apps/mcp_server/src
+
+FROM base AS dev
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --package support-tools
-
 RUN useradd --system --uid 10001 --no-create-home tools
 USER tools
-
 EXPOSE 8001
 # The mock store lives in /tmp: the image's only writable place for the non-root user. It is
 # lost when the container is removed, which is fine for mocks.
 ENV MCP_MOCK_DB=/tmp/mcp-mock.sqlite
 CMD ["python", "-m", "support_tools", "--transport", "http", "--host", "0.0.0.0", "--port", "8001"]
+
+FROM base AS build
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-editable --package support-tools
+
+FROM python:3.13.18-slim-trixie AS prod
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH=/app/.venv/bin:$PATH \
+    MCP_MOCK_DB=/tmp/mcp-mock.sqlite \
+    SEED_DIR=/app/data/seed \
+    PORT=8001
+WORKDIR /app
+RUN useradd --system --uid 10001 --no-create-home tools
+COPY --from=build /app/.venv /app/.venv
+COPY data/seed data/seed
+USER tools
+EXPOSE 8001
+CMD ["sh", "-c", "exec python -m support_tools --transport http --host 0.0.0.0 --port \"$PORT\""]

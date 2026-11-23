@@ -79,6 +79,14 @@ Run `2026-11-17-rag_hybrid-4fc85cb`: the linear pipeline with one hybrid knowled
 
 Gate 5 is not met. The error analysis sorts every failure by cause. The prompts were not tuned to these numbers; changes are decided by the owner. Every ticket still goes to operator approval, and auto-reply stays off.
 
+## Load smoke (phase 10, fake models)
+
+**Fake models: model time not included.** `make load-smoke` (P10-08, `infra/load/smoke.py`): 10 parallel demo customers send 50 tickets through the API and the whole workflow (triage, search, write, verify) with recorded model answers, so it measures the service around the models, not answer time. Run on 2026-11-23 against the local e2e stack (`make test-e2e KEEP=1`: one API container, Postgres, Qdrant, local embeddings on a laptop), not a cloud deployment (P10-07 is still waiting for human gate H8).
+
+| Tickets | Latency to the stream's `done` p50 | p95 | Error rate | Lost runs |
+|---|---|---|---|---|
+| 50 (10 customers × 5) | 1,423 ms | 1,915 ms | 0 of 50 (0%) | 0 |
+
 ## Connect to Claude Code
 
 The support-tools MCP server (`apps/mcp_server`, [API](docs/api.md) §7) works from any MCP client. It serves mock data only: the 40 fictional customers of `data/seed`, and Jira and Slack mocks that store calls in a local SQLite file.

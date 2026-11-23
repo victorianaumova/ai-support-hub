@@ -1,0 +1,10 @@
+# The single entry point of infra/compose.prod.yml (VPS fallback, operations §6). With SITE_ADDRESS
+# set to a domain, Caddy gets a certificate on its own; the default `:80` serves plain HTTP for a
+# local check. The API sets every security header itself.
+{$SITE_ADDRESS::80} {
+	encode gzip
+	reverse_proxy api:8000 {
+		# The SSE stream must reach the browser as it is written.
+		flush_interval -1
+	}
+}

@@ -13,5 +13,7 @@
 .coverage
 node_modules
 apps/web/dist
-evals/runs
+# Run summaries go into the API image (the dashboard reads them); per-ticket results never do.
+evals/runs/**/results*.jsonl
 docs
+.cache
