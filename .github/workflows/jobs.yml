@@ -37,9 +37,11 @@ jobs:
             "5 6 */3 * *") jobs="ping" ;;
             *) jobs="$CHOSEN" ;;
           esac
+          # A pasted secret may end in a newline; trim surrounding whitespace (P10-07).
+          token="$(printf '%s' "$JOBS_TOKEN" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
           for job in $jobs; do
             echo "job $job"
-            curl -fsS --max-time 300 -X POST -H "Authorization: Bearer $JOBS_TOKEN" \
+            curl -fsS --max-time 300 -X POST -H "Authorization: Bearer $token" \
               "$DEMO_URL/api/v1/admin/jobs/$job"
             echo
           done

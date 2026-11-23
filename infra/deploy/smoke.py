@@ -61,7 +61,9 @@ def main() -> int:
     with httpx2.Client(base_url=args.url, timeout=httpx2.Timeout(120)) as client:
         ready(client)
         if args.canary:
-            canary(client, os.environ["DEMO_ACCESS_CODE"])
+            canary(
+                client, os.environ["DEMO_ACCESS_CODE"].strip()
+            )  # a pasted secret may end in "\n"
     print("smoke: ok")
     return 0
 

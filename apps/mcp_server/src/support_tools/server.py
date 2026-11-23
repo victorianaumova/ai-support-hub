@@ -100,7 +100,8 @@ class ServerSettings:
             seed_dir=Path(env.get("SEED_DIR") or DEFAULT_SEED_DIR),
             mock_db=Path(env.get("MCP_MOCK_DB") or DEFAULT_MOCK_DB),
             anchor_date=date.fromisoformat(anchor) if anchor else None,
-            token=env.get("MCP_SERVER_TOKEN", ""),
+            # A pasted secret may end in a newline (P10-07); the Hub strips it the same way.
+            token=env.get("MCP_SERVER_TOKEN", "").strip(),
         )
 
 
