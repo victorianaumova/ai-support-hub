@@ -614,32 +614,33 @@ async def give_feedback(
 
     # The comment is customer text like a message: masked before it is stored.
     masked = mask(body.comment) if body.comment else None
-    feedback = await feedbacks.add(
-        ticket_id=ticket.id,
-        message_id=message.id,
-        rating=body.rating,
-        comment=masked.text if masked else None,
-    )
-    await record(
-        session,
-        actor_type=ActorType.CUSTOMER,
-        actor_id=customer.id,
-        action="feedback.created",
-        entity_type="message",
-        entity_id=message.id,
-        details={"feedback_id": feedback.id, "rating": body.rating.value},
-    )
-    if masked is not None:
-        await audit_masking(session, masked, entity_type="feedback", entity_id=feedback.id)
     try:
+        feedback = await feedbacks.add(
+            ticket_id=ticket.id,
+            message_id=message.id,
+            rating=body.rating,
+            comment=masked.text if masked else None,
+        )
+        feedback_id = feedback.id
+        await record(
+            session,
+            actor_type=ActorType.CUSTOMER,
+            actor_id=customer.id,
+            action="feedback.created",
+            entity_type="message",
+            entity_id=message.id,
+            details={"feedback_id": feedback_id, "rating": body.rating.value},
+        )
+        if masked is not None:
+            await audit_masking(session, masked, entity_type="feedback", entity_id=feedback_id)
         await session.commit()
     except IntegrityError:
-        # Another request stored the first rating (unique `feedback.message_id`, migration
-        # 0014): answer like a repeat.
+        # Another writer stored the first rating (unique `feedback.message_id`, migration
+        # 0014): answer like a repeat, with nothing written.
         await session.rollback()
         first = await feedbacks.get_for_message(body.message_id)
         if first is None:
             raise
         response.status_code = 200
         return FeedbackOut(id=first.id)
-    return FeedbackOut(id=feedback.id)
+    return FeedbackOut(id=feedback_id)

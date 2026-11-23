@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import exc, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from hub.db.models import (
@@ -268,7 +269,11 @@ async def test_first_feedback_of_a_message(app_session: AsyncSession) -> None:
     repo = FeedbackRepository(app_session)
     assert await repo.get_for_message(message.id) is None
     first = await repo.add(ticket_id=ticket.id, message_id=message.id, rating=FeedbackRating.UP)
-    await repo.add(ticket_id=ticket.id, message_id=message.id, rating=FeedbackRating.DOWN)
+    assert await repo.get_for_message(message.id) is first
+    # A second rating is refused by the database (migration 0014, P10-02).
+    async with app_session.begin_nested():
+        with pytest.raises(IntegrityError):
+            await repo.add(ticket_id=ticket.id, message_id=message.id, rating=FeedbackRating.DOWN)
     assert await repo.get_for_message(message.id) is first
 
 
