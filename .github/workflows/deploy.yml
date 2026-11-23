@@ -85,19 +85,28 @@ jobs:
             --min-instances 0 --max-instances 1 --cpu 1 --memory 512Mi \
             --set-secrets MCP_SERVER_TOKEN=mcp-server-token:latest --quiet
 
-      - name: Deploy the API (one instance at most: the rate limiter counts in memory)
+      - name: "Deploy the API (one instance at most: the rate limiter counts in memory)"
         env:
           TAG: ${{ github.event.workflow_run.head_sha || github.sha }}
           QDRANT_URL: ${{ vars.QDRANT_URL }}
+          # Run traces (P9-01, ADR-0021) are optional: the two Langfuse secrets are passed only
+          # when LANGFUSE_ENABLED is true, because --set-secrets fails on a missing secret.
+          LANGFUSE_ENABLED: ${{ vars.LANGFUSE_ENABLED }}
+          LANGFUSE_HOST: ${{ vars.LANGFUSE_HOST }}
+          LANGFUSE_PROJECT_ID: ${{ vars.LANGFUSE_PROJECT_ID }}
         run: |
           mcp_url="$(gcloud run services describe support-tools --project "$PROJECT" \
             --region "$REGION" --format='value(status.url)')"
+          secrets="DATABASE_URL=database-url:latest,SESSION_SECRET=session-secret:latest,DEMO_ACCESS_CODE=demo-access-code:latest,JOBS_TOKEN=jobs-token:latest,MCP_SERVER_TOKEN=mcp-server-token:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,QDRANT_API_KEY=qdrant-api-key:latest"
+          if [ "$LANGFUSE_ENABLED" = "true" ]; then
+            secrets="$secrets,LANGFUSE_PUBLIC_KEY=langfuse-public-key:latest,LANGFUSE_SECRET_KEY=langfuse-secret-key:latest"
+          fi
           gcloud run deploy hub-api --project "$PROJECT" --region "$REGION" \
             --image "$REGISTRY/hub-api:$TAG" --allow-unauthenticated \
             --service-account "hub-api@$PROJECT.iam.gserviceaccount.com" \
             --min-instances 0 --max-instances 1 --cpu 1 --memory 1Gi --concurrency 20 \
-            --set-env-vars "MCP_SERVER_URL=$mcp_url/mcp,MCP_SERVER_AUDIENCE=$mcp_url,QDRANT_URL=$QDRANT_URL,DAILY_BUDGET_USD=0.20,AUTO_REPLY_ALLOWED=false,FORWARDED_ALLOW_IPS=*,EVAL_DATABASE_URL=" \
-            --set-secrets "DATABASE_URL=database-url:latest,SESSION_SECRET=session-secret:latest,DEMO_ACCESS_CODE=demo-access-code:latest,JOBS_TOKEN=jobs-token:latest,MCP_SERVER_TOKEN=mcp-server-token:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,QDRANT_API_KEY=qdrant-api-key:latest" \
+            --set-env-vars "MCP_SERVER_URL=$mcp_url/mcp,MCP_SERVER_AUDIENCE=$mcp_url,QDRANT_URL=$QDRANT_URL,DAILY_BUDGET_USD=0.20,AUTO_REPLY_ALLOWED=false,FORWARDED_ALLOW_IPS=*,EVAL_DATABASE_URL=,LANGFUSE_HOST=$LANGFUSE_HOST,LANGFUSE_PROJECT_ID=$LANGFUSE_PROJECT_ID" \
+            --set-secrets "$secrets" \
             --quiet
           echo "API_URL=$(gcloud run services describe hub-api --project "$PROJECT" --region "$REGION" --format='value(status.url)')" >> "$GITHUB_ENV"
 
