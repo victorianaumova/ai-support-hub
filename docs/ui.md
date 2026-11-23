@@ -70,7 +70,7 @@ Three columns on desktop, stacked on mobile.
 - *Sources:* evidence chunks (title, section, score, text; the cited ones first and highlighted; a click on a citation chip scrolls here), account facts with the tool that returned them.
 - *Customer:* profile, tier, limits used, restriction flag, cards, recent transactions. Limits, flag, cards and the newest 10 transactions are read when the tab opens, through the core read tools with the tool permissions (`GET /console/tickets/{id}/account`, node `console`; owner decision, PR #66). Data that could not be read is shown as "Unknown", never as "no" or "not flagged".
 - *History:* memory summaries of earlier tickets, links to them.
-- *Run:* steps with duration, tool calls, model, prompt versions, cost, link to the trace. Steps with duration are deferred to P9-01 (owner decision, PR #66; note that ADR-0019 lists P9-01 as not built, so nothing schedules them yet); until then the tab lists the recorded model calls and tool calls of the run with their latencies. The trace link was removed with tracing (ADR-0019).
+- *Run:* steps with duration, tool calls, model, prompt versions, cost, link to the trace. Steps with duration are deferred to P9-01 (owner decision, PR #66: P9-01 is restored; ADR-0020 amends ADR-0019 with it); until then the tab lists the recorded model calls and tool calls of the run with their latencies. The trace link was removed with tracing (ADR-0019).
 
 Keyboard shortcuts: `A` approve, `E` focus the editor, `R` reject, `J`/`K` next/previous ticket.
 
@@ -83,7 +83,7 @@ Search field, results with an `internal` / `external` badge, article view.
 
 **Dashboard.** Period picker. Cards: tickets, automation share, median time to answer, cost per ticket, budget used today. Charts: routes per day (stacked), route reasons (bars), draft outcomes (approved unchanged / edited / rejected), latency p50/p95 per day, cost by node, feedback. A box "Last evaluation": date, variant, each metric with target, red line and pass/fail. A simple accessible chart library (for example Recharts) is fine. (As built, P10-04: no library; bars drawn with plain elements, each chart with its numbers as a table.)
 
-**Settings.** Auto-reply switch (with a confirmation dialog that shows the last evaluation result), confidence threshold slider, daily budget, intent allow-list. The slider is shown disabled with the note "Auto-reply is off in this demo", without counts from the last evaluation: the confidence threshold work (P9-03) was cut and auto-reply stays off in the demo (ADR-0019; owner decision, PR #66). No risk–coverage curve, because there is no trained model (ADR-0018). Every change asks for a short reason, which goes to the audit log.
+**Settings.** Auto-reply switch (with a confirmation dialog that shows the last evaluation result), confidence threshold slider, daily budget, intent allow-list. The slider is shown disabled with the current threshold value read-only next to it and the note "Auto-reply is off in this demo", without counts from the last evaluation: the confidence threshold work (P9-03) was cut and auto-reply stays off in the demo (ADR-0019; owner decision, PR #66). No risk–coverage curve, because there is no trained model (ADR-0018). Every change asks for a short reason, which goes to the audit log.
 
 ## 5. Audit page
 Table with filters (entity, actor, action, time), a detail drawer with the JSON, and a "Verify chain" button that shows OK or the first broken record.

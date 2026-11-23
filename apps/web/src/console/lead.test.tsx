@@ -163,12 +163,14 @@ describe("settings", () => {
     expect(confirm).toHaveFocus();
   });
 
-  it("the threshold slider is off: auto-reply is off in this demo, no counts", async () => {
+  it("the threshold slider is off: current value read-only, auto-reply is off in this demo, no counts", async () => {
     serve();
     renderApp("/console/settings");
     const slider = await screen.findByRole("slider");
     expect(slider).toBeDisabled();
-    expect(slider).toHaveAccessibleDescription("Auto-reply is off in this demo.");
+    expect(slider).toHaveValue("0.95");
+    expect(screen.getByRole("status")).toHaveTextContent("Current: 0.95 (read-only)");
+    expect(slider).toHaveAccessibleDescription("Current: 0.95 (read-only) Auto-reply is off in this demo.");
     expect(screen.queryByRole("button", { name: /Save threshold/ })).toBeNull();
   });
 });

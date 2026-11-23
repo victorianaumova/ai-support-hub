@@ -68,12 +68,17 @@ export function SettingsPage() {
 
       <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
         <h2 className="font-semibold">Confidence threshold</h2>
-        <label htmlFor="threshold" className="mt-2 block text-sm">
-          Auto-reply only at a confidence of at least <strong className="tabular-nums">{shownThreshold.toFixed(2)}</strong>
-        </label>
-        {/* UI §4 (owner decision, PR #66): no counts next to the slider; the confidence
-            threshold task was cut and auto-reply stays off in the demo (ADR-0019). */}
-        <input id="threshold" type="range" min={0.5} max={1} step={0.01} value={shownThreshold} disabled aria-describedby="threshold-note" className="mt-1 w-full" />
+        {/* UI §4 (owner decision, PR #66): the current value, read-only, and no counts; the
+            confidence threshold work was cut and auto-reply stays off in the demo (ADR-0019). */}
+        <div className="mt-2 flex items-center gap-3">
+          <label htmlFor="threshold" className="sr-only">
+            Confidence threshold
+          </label>
+          <input id="threshold" type="range" min={0.5} max={1} step={0.01} value={shownThreshold} disabled aria-describedby="threshold-value threshold-note" className="w-full" />
+          <output id="threshold-value" htmlFor="threshold" className="shrink-0 text-sm">
+            Current: <strong className="tabular-nums">{shownThreshold.toFixed(2)}</strong> (read-only)
+          </output>
+        </div>
         <p id="threshold-note" className="mt-1 text-sm text-muted">
           Auto-reply is off in this demo.
         </p>
