@@ -1237,3 +1237,54 @@ async def test_respond_alone_records_the_runs_outcome(
     assert (status, error) == expected
     assert models == {"write": "w"}
     assert finished is not None
+
+
+# --- the kill switch (P10-09) ----------------------------------------------------------------
+
+
+def _settings_put(lead: TestClient, **changes: Any) -> None:  # noqa: ANN401
+    response = lead.put("/api/v1/admin/settings", json={**changes, "reason": "test of the switch"})
+    assert response.status_code == 200, response.text
+
+
+def test_switching_auto_reply_off_sends_the_next_ticket_to_approval(
+    app: FastAPI, run_db: Urls
+) -> None:
+    """Done when of P10-09: a lead's `PUT /admin/settings` counts for the very next run."""
+    add_customer(run_db, "CUS-0002", "Peter Horvat")
+    add_operator(run_db, "lena@tallybridge.test", "lead", name="Lena Lead")
+    lead = operator_client(app, "lena@tallybridge.test")
+    try:
+        _settings_put(
+            lead,
+            auto_reply_enabled=True,
+            confidence_threshold=0.01,
+            intent_allowlist=["withdrawal_issue"],
+        )
+        on_id, on_events = _post(customer_client(app), SEPA)
+        on_route = _one(run_db, "SELECT route, route_reasons FROM runs WHERE ticket_id = %s", on_id)
+        assert on_route == ("auto_reply", [])
+        assert ("ticket.status", {"status": "answered"}) in on_events
+
+        _settings_put(lead, auto_reply_enabled=False)
+        off_id, off_events = _post(customer_client(app, "CUS-0002"), SEPA)
+
+        off_route = _one(
+            run_db, "SELECT route, route_reasons FROM runs WHERE ticket_id = %s", off_id
+        )
+        assert off_route == ("approval", ["auto_reply_off"])
+        assert ("ticket.status", {"status": "pending_approval"}) in off_events
+        changed = run_sql(
+            run_db,
+            "SELECT details->>'key', details->>'reason' FROM audit_log"
+            " WHERE action = 'settings.changed' ORDER BY id",
+        )
+        assert changed == [
+            ("auto_reply_enabled", "test of the switch"),
+            ("confidence_threshold", "test of the switch"),
+            ("intent_allowlist", "test of the switch"),
+            ("auto_reply_enabled", "test of the switch"),
+        ]
+    finally:
+        # Settings are not truncated between tests of this module; the others expect none.
+        run_sql(run_db, "DELETE FROM settings")

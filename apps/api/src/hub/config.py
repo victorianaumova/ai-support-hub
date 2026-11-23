@@ -85,6 +85,8 @@ class Settings(BaseSettings):
 
     daily_budget_usd: float = Field(default=0.5, ge=0)
     eval_max_cost_usd: float = Field(default=1.0, ge=0)
+    # Committed evaluation runs (`metrics.json`, `config.json`); read by `/console/evals/latest`.
+    eval_runs_dir: Path = Path("evals/runs")
     eval_trace_sample: float = Field(default=0.2, ge=0, le=1)
 
     @field_validator("log_level", mode="before")

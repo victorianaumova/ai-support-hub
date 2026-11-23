@@ -1,4 +1,4 @@
-# CI from docs/operations.md §5. Jobs added later: web (P10), e2e (P10). Dependency updates come
+# CI from docs/operations.md §5. Job added later: e2e (P10-05). Dependency updates come
 # from .github/dependabot.yml (P8-06). Every check runs a make target where one exists, so CI and
 # a laptop run the same commands. Actions are pinned by commit SHA; the comment names the release.
 name: ci
@@ -17,6 +17,8 @@ concurrency:
 
 env:
   UV_VERSION: "0.11.8"
+  # Node LTS; pnpm comes from the `packageManager` field of apps/web/package.json.
+  NODE_VERSION: "24"
   # Tests never need a provider key (AGENTS.md): the fake model mode answers instead.
   # Set empty for every job, so no step can pick a key up from the runner.
   ANTHROPIC_API_KEY: ""
@@ -33,8 +35,48 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
       - run: uv sync --all-packages --locked
-      - name: ruff, mypy, import-linter (eslint, tsc once apps/web exists)
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: apps/web/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - run: pnpm -C apps/web install --frozen-lockfile
+      - name: ruff, mypy, import-linter, eslint, tsc
         run: make lint
+
+  # The web app (P10-01): Vitest, the production build, and the generated API types are current.
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: uv sync --all-packages --locked
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: apps/web/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - run: pnpm -C apps/web install --frozen-lockfile
+      - name: Generated API types match the API
+        run: |
+          make web-types
+          git diff --exit-code -- apps/web/src/api/schema.d.ts \
+            || { echo "::error::run make web-types and commit apps/web/src/api/schema.d.ts"; exit 1; }
+      - name: Vitest
+        run: pnpm -C apps/web test
+      - name: Production build
+        run: pnpm -C apps/web build
 
   test:
     runs-on: ubuntu-latest
@@ -136,11 +178,9 @@ jobs:
           uv run pip-audit -r "$RUNNER_TEMP/requirements.txt" \
             --require-hashes --disable-pip --strict --progress-spinner off
 
-      # Skipped until the web app exists (P10-01 adds apps/web/package.json and pnpm-lock.yaml);
-      # then it fails the job on a high or critical advisory. pnpm 12.18.0 (2026-11-05): keep it
-      # equal to the `packageManager` field P10-01 writes into apps/web/package.json.
-      - name: pnpm audit (web app, once it exists)
-        if: hashFiles('apps/web/package.json') != ''
+      # Fails the job on a high or critical advisory. pnpm 12.18.0: keep it equal to the
+      # `packageManager` field of apps/web/package.json.
+      - name: pnpm audit (web app)
         working-directory: apps/web
         run: npx --yes pnpm@12.18.0 audit --audit-level high
 

@@ -53,3 +53,8 @@ docs/walkthrough/
 
 # Hypothesis example database
 .hypothesis/
+
+# Web app (P10-01): the OpenAPI document `make web-types` reads, Playwright output
+apps/web/openapi.json
+apps/web/playwright-report/
+apps/web/test-results/
