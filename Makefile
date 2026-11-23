@@ -8,9 +8,9 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 BUILT := setup lint test data-check kb-numbers up down dev test-int migrate seed kb-load \
-	record-llm llm-requests eval eval-attacks leak-scan models mcp mcp-smoke retention
+	record-llm llm-requests eval eval-attacks leak-scan models mcp mcp-smoke retention web-types
 NOT_IMPLEMENTED := test-e2e \
-	eval-smoke eval-report web-types \
+	eval-smoke eval-report \
 	export-review-candidates rollback
 
 .PHONY: eval-rejudge help $(BUILT) $(NOT_IMPLEMENTED)
@@ -21,7 +21,7 @@ help:
 
 setup:
 	uv sync --all-packages --locked
-	@if [ -f apps/web/package.json ]; then pnpm install; else echo "web: apps/web has no package.json yet, skipping pnpm install"; fi
+	pnpm -C apps/web install --frozen-lockfile
 	@if [ ! -f .env ]; then cp .env.example .env && echo "created .env from .env.example"; fi
 	uv run pre-commit install
 	$(MAKE) --no-print-directory models
@@ -37,7 +37,8 @@ lint:
 	uv run ruff format --check .
 	uv run mypy
 	uv run lint-imports --no-logo
-	@if [ -f apps/web/package.json ]; then pnpm -C apps/web lint && pnpm -C apps/web typecheck; else echo "web: apps/web has no package.json yet, skipping eslint and tsc"; fi
+	pnpm -C apps/web lint
+	pnpm -C apps/web typecheck
 
 # Coverage gate for deterministic safety code (AGENTS.md, security §3): >= 95% line coverage.
 # hub.domain holds the ticket status transitions and the seed rules; hub.audit.chain the audit
@@ -51,8 +52,18 @@ SAFETY_COVERAGE := --cov=hub.guardrails --cov=hub.domain --cov=hub.audit.chain -
 	--cov=hub.graph.routing --cov=hub.graph.confidence --cov=hub.tools.permissions \
 	--cov-report=term-missing:skip-covered --cov-fail-under=95
 
+# Python unit tests, then the web app's Vitest tests (P10-01). The CI `test` job has no Node; its
+# `web` job runs the Vitest tests, so the web step is skipped where `make setup` did not install.
 test:
 	uv run pytest $(SAFETY_COVERAGE)
+	@if [ -d apps/web/node_modules ]; then pnpm -C apps/web test; else echo "web: no node_modules (run make setup); Vitest skipped"; fi
+
+# TypeScript types of the API for the web app (api.md: generated, never written by hand). The
+# OpenAPI document comes from the app object itself, so no server, database or .env is needed.
+# CI regenerates them and fails when the committed file differs.
+web-types:
+	uv run python -m hub.openapi > apps/web/openapi.json
+	pnpm -C apps/web types
 
 data-check:
 	uv run python -m hub_evals.data_check data

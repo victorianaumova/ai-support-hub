@@ -68,7 +68,7 @@ forbidden_modules = ["hub.*", "support_tools", "hub_evals"]
 
 [[tool.importlinter.contracts]]
 id = "services-not-api-graph"
-name = "guardrails, kb, llm, tools, memory, audit, privacy do not import api or graph"
+name = "service modules (design §8) do not import api or graph"
 type = "forbidden"
 source_modules = [
     "hub.guardrails",
@@ -78,6 +78,7 @@ source_modules = [
     "hub.memory",
     "hub.audit",
     "hub.privacy",
+    "hub.metrics",
 ]
 forbidden_modules = ["hub.api", "hub.graph"]
 

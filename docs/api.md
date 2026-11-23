@@ -78,12 +78,12 @@ All need `hub_operator`. Minimum role in brackets.
 | POST | `/console/tickets/{id}/close` [operator] | Body `{"ticket_version"}`. Only `answered` or `handed_off` tickets (state diagram); another status → `409 conflict`. A run still paused is resumed with `kind = close` and ends without a message (P6-03). Then the memory summary is written (P6-05, [AI pipeline](ai-pipeline.md) §9); its failure never fails the close. |
 | GET | `/console/kb/search?q=&mode=&limit=` [operator] | Search over every chunk, `internal` included (compliance cannot use it). `q` 1–500 characters, masked (G1) before it is embedded; `mode` `hybrid` (default) or `dense`; `limit` 1–20, default 6. Returns `{"items": [{"chunk_id", "doc_id", "title", "section", "url", "visibility", "text", "score", "rank"}]}`. Qdrant or the local model not available → `503 kb_unavailable`. |
 | GET | `/console/kb/documents/{id}` [operator] | Article text. |
-| GET | `/console/metrics/summary?from=&to=` [lead] | Numbers for the dashboard (section 5). |
-| GET | `/console/metrics/timeseries?metric=&bucket=day` [lead] | |
-| GET | `/console/evals/latest` [lead] | Summary of the newest committed eval report. |
-| GET | `/console/audit` [compliance, lead] | Filters: `entity_type`, `entity_id`, `actor_id`, `action`, `from`, `to`. |
-| GET | `/console/audit/verify` [compliance, lead] | Checks the hash chain; returns the first broken id or `ok`. |
-| GET / PUT | `/admin/settings` [lead] | `auto_reply_enabled`, `confidence_threshold`, `daily_budget_usd`, `intent_allowlist` (may only remove intents from the list in `config/policy.yaml`; adding another intent returns 422). |
+| GET | `/console/metrics/summary?from=&to=` [lead] | Numbers for the dashboard (section 5). `from`, `to`: dates (whole UTC days, both included); default the 7 days up to today; one missing end is filled from the other (7 days); `from` after `to` or more than 366 days → `422 validation_error`. |
+| GET | `/console/metrics/timeseries?metric=&bucket=day&from=&to=` [lead] | One point per day of the period, empty days filled: `{"metric", "bucket": "day", "period": {"from", "to"}, "points": [{"date", "values": {...}}]}`. `metric`: `tickets` (`total`), `routes` (`auto_reply`, `approval`, `handoff`), `latency` (`p50`, `p95` in ms; `null` without runs), `cost` (`total_usd`). Each is defined as in section 5, per day of the ticket's creation (cost: per day of the call). Only `bucket=day`. |
+| GET | `/console/evals/latest` [lead] | `{"run": null}` or `{"run": {"run_id", "date", "variant", "git_sha", "tickets_finished", "cost_usd", "checks": [{"name", "shown", "target_text", "red_line_text", "status", "judged"}]}}`: the newest clean real-model run of the dev tickets in `EVAL_RUNS_DIR` (its committed `config.json` and `metrics.json`). Skipped: attack runs, `-fake` and `-dirty` folders, `git_dirty` runs, unreadable folders. Newest: the date in the folder name, then the time `metrics.json` was written, then the name (`hub/metrics/evals.py`). |
+| GET | `/console/audit` [compliance, lead] | Filters: `entity_type`, `entity_id`, `actor_id`, `action` (exact), `from`, `to` (timestamps, `to` exclusive). Newest first, `limit` 1–200 (default 50), `cursor` = the id of the last row of the previous page. Items: `{"id", "ts", "actor_type", "actor_id", "action", "entity_type", "entity_id", "details"}` as stored (masked). |
+| GET | `/console/audit/verify` [compliance, lead] | Checks the hash chain: `{"ok", "checked", "broken_id"}` (`broken_id` the first row that does not verify, else `null`). |
+| GET / PUT | `/admin/settings` [lead] | `GET` → `{"auto_reply_enabled", "confidence_threshold", "daily_budget_usd", "intent_allowlist", "allowed_intents"}` (a missing or broken stored value shows as `false`, `null`, `null`, `[]`; `allowed_intents` is the `auto_reply_allowlist` of `config/policy.yaml`, the most the allow-list may hold). `PUT` changes only the fields it sends, plus a required `reason` (3–500 characters): `auto_reply_enabled` (bool), `confidence_threshold` (number in (0, 1]), `daily_budget_usd` (0–100), `intent_allowlist` (may only remove intents from the policy's list; another intent → `422 validation_error`, error type `intent_not_allowed`; stored in policy order without duplicates). No field → `422` (`no_change`); unknown field → `422`. Each changed key writes one `settings.changed` audit record (entity `setting`, details `key`, `old`, `new`, `reason`) in the same transaction; a field sent with its current value writes nothing. Answers like `GET`. `decide` reads the settings on every run and the budget guard before every model call, so a change counts from the next ticket (P10-09). |
 | POST | `/admin/kb/reindex?full=false` [admin] | Reload `data/kb` into Postgres and sync the index (only changed chunks are embedded); `full=true` builds a new collection and moves the alias. Returns `{"full", "collection", "documents_added", "documents_updated", "documents_removed", "chunks_embedded", "chunks_payload_updated", "chunks_deleted"}`; audited as `kb.reindexed`. Invalid files → `422 kb_invalid` (nothing written); Qdrant or the model not available → `503 kb_unavailable`. |
 | POST | `/admin/runs/recover` [admin] | Resume runs stuck in `running` (started longer ago than any run can take and not run by this process; [ai-pipeline](ai-pipeline.md) §1, P6-03), and lost resumes (P8-05: an `interrupted` run whose operator decision was committed longer ago than that but never resumed it; the decision is rebuilt from the draft, the ticket and the audit log), one after the other, inside the request. Returns `{"found", "resumed", "failed"}` (both kinds counted; `failed`: the run failed again and its ticket went to a human, or stays with the human who has it); each recovery is audited as `run.recovered` (`from`: `checkpoint`, `restart` or `lost_resume`). No workflow configured → `503 workflow_unavailable`. |
 | POST | `/admin/jobs/{name}` [job token] | `Authorization: Bearer <JOBS_TOKEN>` (constant-time comparison; no session, no CSRF token). `name` = `retention` (security §6: `{"tickets_deleted", "messages_deleted", "drafts_deleted", "runs_deleted", "tool_calls_deleted", "feedback_deleted", "memory_deleted", "checkpoint_threads_deleted"}`) \| `recover-runs` (as `POST /admin/runs/recover` with the job as the actor: `{"found", "resumed", "failed", "lost_resumes"}`) \| `close-stale` (close `answered` tickets whose newest customer message is older than 72 h, one by one through the checked status path, each with `ticket.closed` (actor `system`) and its memory summary: `{"found", "closed"}`) \| `ping` (counts the chunks in Postgres and the points in Qdrant so the free services stay awake: `{"postgres_chunks", "qdrant_points"}`; a service down → `503 ping_failed`). Returns `{"job": name, "report": {...}}`; every run is audited as `job.ran` with the report (a failed run with `{"error": <class>}`). Missing or wrong token → `401 unauthorized`; `JOBS_TOKEN` empty → `503 jobs_unavailable`; unknown name → `404 not_found`. |
@@ -121,16 +121,27 @@ The server sends a comment line (`: ping`) every 10 s to keep the connection ope
 {
   "period": {"from": "2026-11-01", "to": "2026-11-12"},
   "tickets": {"total": 412, "auto_reply": 151, "approval": 139, "handoff": 122},
-  "automation_share": 0.367,
-  "ai_resolved_share": 0.311,
-  "route_reasons": [{"reason": "policy_intent", "count": 61}, {"reason": "low_confidence", "count": 88}],
-  "drafts": {"approved": 80, "edited": 41, "rejected": 18, "approved_unchanged_share": 0.576, "median_edit_ratio": 0.12},
+  "automation_share": 0.3665,
+  "ai_resolved_share": 0.3107,
+  "route_reasons": [{"reason": "low_confidence", "count": 88}, {"reason": "policy_intent", "count": 61}],
+  "drafts": {"approved": 80, "edited": 41, "rejected": 18, "approved_unchanged_share": 0.5755, "median_edit_ratio": 0.12},
+  "first_response_ms": {"p50": 6100, "p95": 14800},
   "latency_ms": {"p50": 5400, "p95": 13100},
-  "cost_usd": {"total": 14.2, "per_ticket": 0.034, "by_node": {"triage": 0.9, "research": 5.1, "write": 6.8, "verify": 1.4}},
+  "cost_usd": {"total": 14.2, "per_ticket": 0.034466, "by_node": {"triage": 0.9, "research": 5.1, "write": 6.8, "verify": 1.4}},
   "feedback": {"up": 96, "down": 14},
-  "budget": {"daily_limit_usd": 3.0, "spent_today_usd": 0.42}
+  "budget": {"daily_limit_usd": 0.2, "spent_today_usd": 0.042}
 }
 ```
+
+Definitions (`hub/metrics/dashboard.py`, P10-09; every number is one SQL query, and `tests/integration/test_metrics_api.py` checks them on seeded rows):
+- **Tickets of the period:** tickets **created** in it. A ticket's **route** and **route reasons** are those of its **first run that has a route** (how the AI routed the ticket when it arrived); later runs of the same ticket do not count again. `total` also counts tickets without a routed run (still `processing`).
+- `automation_share` = `auto_reply` ÷ `total`. `ai_resolved_share` = tickets first routed `auto_reply` that are `closed` with no operator message, no run with the reason `customer_request` and no "not helpful" feedback, ÷ `total` (PRD §6). Both `null` when `total` is 0.
+- `route_reasons`: each reason of each first routed run, most frequent first.
+- `drafts`: reviewed drafts of the period's tickets (every run's draft); `approved_unchanged_share` = approved ÷ (approved + edited + rejected); `median_edit_ratio` over the edited drafts. `null` without data.
+- `first_response_ms`: `first_response_at − created_at` of the period's tickets that have one (median and p95). `latency_ms`: `runs.latency_ms` of every run of the period's tickets. Percentiles are linear (`percentile_cont`); `null` without data.
+- `cost_usd`: real-mode model calls written **in the period** with context `online` or `memory` (the rows the budget guard counts, without `record`); `per_ticket` = total ÷ the period's `total` tickets (`null` when 0); `by_node` per `llm_calls.node`. Fake-mode calls cost nothing here.
+- `feedback`: ratings on the period's tickets.
+- `budget`: always **today** (UTC), whatever the period: the `daily_budget_usd` setting (else `DAILY_BUDGET_USD`) and today's real-mode spend, as the budget guard computes them.
 
 ## 6. Health
 

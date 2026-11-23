@@ -203,7 +203,7 @@ Each decision has an ADR with alternatives.
 
 Module rules (enforced by import-linter in CI):
 - `domain` imports nothing from the project.
-- `guardrails`, `kb`, `llm`, `tools`, `memory`, `audit`, `privacy` do not import `api` or `graph`.
+- `guardrails`, `kb`, `llm`, `tools`, `memory`, `audit`, `privacy`, `metrics` do not import `api` or `graph`.
 - Only `llm/gateway.py` imports `litellm`; everything else reaches models through the gateway.
 - `graph` is the only module that combines the others. `api` calls `graph` and repositories.
 - `apps/mcp_server` and `apps/api` do not import each other. They talk only over MCP.
