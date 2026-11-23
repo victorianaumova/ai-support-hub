@@ -17,6 +17,7 @@ from hub.observability.readiness import (
     mcp_check,
     postgres_check,
     qdrant_check,
+    qdrant_port,
 )
 
 MakeClient = Callable[..., TestClient]
@@ -147,6 +148,26 @@ async def test_qdrant_check_sends_the_api_key() -> None:
     seen: list[httpx2.Request] = []
     await qdrant_check("https://x.cloud.qdrant.io", "secret-key", transport=_transport(200, seen))()
     assert seen[0].headers["api-key"] == "secret-key"
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("https://x.cloud.qdrant.io", "https://x.cloud.qdrant.io:6333"),
+        ("https://x.cloud.qdrant.io/", "https://x.cloud.qdrant.io:6333"),
+        ("http://qdrant:6333", "http://qdrant:6333"),
+        ("http://localhost:7000/", "http://localhost:7000"),
+    ],
+)
+def test_qdrant_check_uses_the_port_of_the_client(url: str, expected: str) -> None:
+    # qdrant-client talks to 6333 when the URL names no port; the check must call the same.
+    assert qdrant_port(url) == expected
+
+
+async def test_qdrant_check_calls_the_cloud_url_on_6333() -> None:
+    seen: list[httpx2.Request] = []
+    await qdrant_check("https://x.cloud.qdrant.io", "k", transport=_transport(200, seen))()
+    assert str(seen[0].url) == "https://x.cloud.qdrant.io:6333/readyz"
 
 
 @pytest.mark.parametrize("status", [204, 200])

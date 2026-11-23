@@ -7,6 +7,7 @@ checks free of app lifecycle. The caller applies the timeout.
 
 from collections.abc import Awaitable, Callable
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx2
 import psycopg
@@ -74,12 +75,28 @@ def _mcp_answered(status: int) -> bool:
 def qdrant_check(
     qdrant_url: str, api_key: str = "", transport: httpx2.AsyncBaseTransport | None = None
 ) -> ReadinessCheck:
-    # A local Qdrant answers /readyz without a key, but Qdrant Cloud answers 403 without one
-    # (first deploy, P10-07), so the key goes along when it is set.
+    # A local Qdrant answers /readyz without a key, but Qdrant Cloud wants one (P10-07), so the
+    # key goes along when it is set. The port is the one the KB client uses (`qdrant_port`).
     headers = {"api-key": api_key} if api_key else None
     return http_check(
-        f"{qdrant_url.rstrip('/')}/readyz", accept=_is_success, headers=headers, transport=transport
+        f"{qdrant_port(qdrant_url)}/readyz",
+        accept=_is_success,
+        headers=headers,
+        transport=transport,
     )
+
+
+QDRANT_DEFAULT_PORT = 6333
+
+
+def qdrant_port(qdrant_url: str) -> str:
+    """The URL with the port qdrant-client uses: 6333 when the URL names none (qdrant-client
+    1.20, `AsyncQdrantRemote`). On the first deploy (P10-07) the KB client worked on 6333
+    while /readyz on the bare Qdrant Cloud URL (443) answered 403."""
+    parts = urlsplit(qdrant_url.rstrip("/"))
+    if parts.port is not None or parts.hostname is None:
+        return qdrant_url.rstrip("/")
+    return urlunsplit(parts._replace(netloc=f"{parts.netloc}:{QDRANT_DEFAULT_PORT}"))
 
 
 def mcp_check(
