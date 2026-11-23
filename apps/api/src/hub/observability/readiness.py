@@ -72,10 +72,14 @@ def _mcp_answered(status: int) -> bool:
 
 
 def qdrant_check(
-    qdrant_url: str, transport: httpx2.AsyncBaseTransport | None = None
+    qdrant_url: str, api_key: str = "", transport: httpx2.AsyncBaseTransport | None = None
 ) -> ReadinessCheck:
-    # Qdrant's /readyz needs no API key (Qdrant docs, "Monitoring").
-    return http_check(f"{qdrant_url.rstrip('/')}/readyz", accept=_is_success, transport=transport)
+    # A local Qdrant answers /readyz without a key, but Qdrant Cloud answers 403 without one
+    # (first deploy, P10-07), so the key goes along when it is set.
+    headers = {"api-key": api_key} if api_key else None
+    return http_check(
+        f"{qdrant_url.rstrip('/')}/readyz", accept=_is_success, headers=headers, transport=transport
+    )
 
 
 def mcp_check(

@@ -136,6 +136,19 @@ async def test_qdrant_check_calls_readyz() -> None:
     assert str(seen[0].url) == "http://qdrant:6333/readyz"
 
 
+async def test_qdrant_check_sends_no_key_when_none_is_set() -> None:
+    seen: list[httpx2.Request] = []
+    await qdrant_check("http://qdrant:6333", transport=_transport(200, seen))()
+    assert "api-key" not in seen[0].headers
+
+
+async def test_qdrant_check_sends_the_api_key() -> None:
+    # Qdrant Cloud answers /readyz with 403 without the key.
+    seen: list[httpx2.Request] = []
+    await qdrant_check("https://x.cloud.qdrant.io", "secret-key", transport=_transport(200, seen))()
+    assert seen[0].headers["api-key"] == "secret-key"
+
+
 @pytest.mark.parametrize("status", [204, 200])
 async def test_qdrant_check_accepts_2xx(status: int) -> None:
     await qdrant_check("http://qdrant:6333", transport=_transport(status, []))()

@@ -128,7 +128,7 @@ def build_container(settings: Settings) -> Container:
         kb=kb,
         readiness_checks={
             "postgres": postgres_check(settings.database_url.get_secret_value()),
-            "qdrant": qdrant_check(settings.qdrant_url),
+            "qdrant": qdrant_check(settings.qdrant_url, settings.qdrant_api_key.get_secret_value()),
             "kb_index": kb_index_check(counts),
             "mcp": mcp_check(
                 settings.mcp_server_url,
