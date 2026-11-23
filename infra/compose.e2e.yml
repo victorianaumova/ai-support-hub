@@ -1,0 +1,47 @@
+# End-to-end stack (P10-05, `make test-e2e`): the dev stack of docker-compose.yml under its own
+# project name (`-p support-hub-e2e`, own volumes), with fixed test settings instead of `.env`,
+# fake models, and the built web app served by the API on one port (127.0.0.1:8100), as in
+# production. Never real secrets: these values exist only for this throwaway stack.
+#   docker compose -p support-hub-e2e -f infra/docker-compose.yml -f infra/compose.e2e.yml up
+x-test-settings: &test-settings
+  APP_ENV: test
+  LLM_MODE: fake
+  SESSION_SECRET: e2e-session-secret-not-a-real-secret-000
+  DEMO_ACCESS_CODE: e2e-access-code
+  SEED_OPERATOR_PASSWORD: e2e-operator-password
+  JOBS_TOKEN: e2e-jobs-token
+  MCP_SERVER_TOKEN: e2e-mcp-token
+  CORE_ANCHOR_DATE: "2026-11-12"
+  # The highest daily budget: fake-mode calls never count, this only keeps the guard quiet.
+  DAILY_BUDGET_USD: "1.00"
+
+services:
+  postgres:
+    ports: !reset []
+  qdrant:
+    ports: !reset []
+  mcp:
+    env_file: !reset []
+    environment: *test-settings
+    ports: !reset []
+  api:
+    env_file: !reset []
+    environment:
+      <<: *test-settings
+      # No account tools: the recorded model answers (tests/fixtures/llm) were made without them,
+      # so a run with tools would find no recording and hand every ticket off.
+      MCP_SERVER_TOKEN: ""
+      WEB_DIST_DIR: /app/web
+      DATABASE_URL: postgresql+psycopg://hub_api:hub_api@postgres:5432/hub
+      DATABASE_URL_DIRECT: postgresql+psycopg://hub:hub@postgres:5432/hub
+      EVAL_DATABASE_URL: ""
+      QDRANT_URL: http://qdrant:6333
+      MCP_SERVER_URL: http://mcp:8001/mcp
+      EMBEDDING_CACHE_DIR: /app/.cache/models
+    ports: !override
+      - "127.0.0.1:8100:8000"
+    volumes:
+      - ../apps/web/dist:/app/web:ro
+      - ../data/seed:/app/data/seed:ro
+      - ../infra/alembic:/app/infra/alembic:ro
+      - ../infra/alembic.ini:/app/infra/alembic.ini:ro

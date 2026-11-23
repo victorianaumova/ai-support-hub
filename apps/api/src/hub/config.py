@@ -80,6 +80,8 @@ class Settings(BaseSettings):
     seed_operator_password: SecretStr = SecretStr("")
     # The chat's customer picker: which demo customers, a hint and first messages (P10-02).
     demo_customers_file: Path = Path("data/seed/demo_customers.json")
+    # The built web app (`pnpm -C apps/web build`); the API serves it when set (P10-06).
+    web_dist_dir: Path | None = None
 
     langfuse_public_key: str = ""
     langfuse_secret_key: SecretStr = SecretStr("")

@@ -1,0 +1,128 @@
+# Single-host production stack (operations §6, the fallback to Cloud Run; P10-06):
+#   docker compose -f infra/compose.prod.yml up --build
+# serves the whole app (API + built web app) on ONE port through Caddy: 80 by default, or HTTPS
+# for SITE_ADDRESS. Secrets come from ../.env (SESSION_SECRET, DEMO_ACCESS_CODE, JOBS_TOKEN,
+# MCP_SERVER_TOKEN, SEED_OPERATOR_PASSWORD, ANTHROPIC_API_KEY, POSTGRES_PASSWORD); nothing is baked
+# into an image. Only Caddy publishes a port: Postgres is reachable only on the stack's own network,
+# where the app role keeps the init script's password (infra/postgres/init/02-app-user.sql; change
+# it with ALTER ROLE and DATABASE_URL on a real host).
+name: support-hub-prod
+
+x-hub-env: &hub-env
+  env_file:
+    - path: ../.env
+      required: false
+  environment:
+    DATABASE_URL: postgresql+psycopg://hub_api:hub_api@postgres:5432/hub
+    DATABASE_URL_DIRECT: postgresql+psycopg://hub:${POSTGRES_PASSWORD:-hub}@postgres:5432/hub
+    EVAL_DATABASE_URL: ""
+    QDRANT_URL: http://qdrant:6333
+    MCP_SERVER_URL: http://mcp:8001/mcp
+    # The production budget guard (owner decision, operations §6).
+    DAILY_BUDGET_USD: ${DAILY_BUDGET_USD:-0.20}
+    LLM_MODE: ${LLM_MODE:-real}
+    # Only Caddy talks to the API; it sets X-Forwarded-For.
+    FORWARDED_ALLOW_IPS: "*"
+
+services:
+  postgres:
+    image: postgres:17.12-alpine
+    environment:
+      POSTGRES_USER: hub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hub}
+      POSTGRES_DB: hub
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --host 127.0.0.1 --username hub --dbname hub"]
+      start_period: 60s
+      start_interval: 2s
+      interval: 30s
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.20.0
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - exec 3<>/dev/tcp/127.0.0.1/6333 && printf 'GET /readyz HTTP/1.0\r\n\r\n' >&3 && head -n 1 <&3 | grep -q ' 200 '
+      start_period: 60s
+      start_interval: 2s
+      interval: 30s
+    restart: unless-stopped
+
+  mcp:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.mcp
+      target: prod
+    env_file:
+      - path: ../.env
+        required: false
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import urllib.error, urllib.request
+          try:
+              urllib.request.urlopen('http://127.0.0.1:8001/mcp', timeout=2)
+          except urllib.error.HTTPError as e:
+              raise SystemExit(e.code != 401)
+      start_period: 30s
+      start_interval: 2s
+      interval: 30s
+    restart: unless-stopped
+
+  # One-shot: migrations as the schema owner, then demo data and the knowledge base (idempotent).
+  setup:
+    build: &api-build
+      context: ..
+      dockerfile: infra/Dockerfile.api
+      target: prod
+    <<: *hub-env
+    command:
+      - sh
+      - -c
+      - alembic -c infra/alembic.ini upgrade head && python -m hub.seed data/seed && python -m hub.kb.service data/kb
+    depends_on:
+      postgres: {condition: service_healthy}
+      qdrant: {condition: service_healthy}
+
+  api:
+    build: *api-build
+    <<: *hub-env
+    depends_on:
+      setup: {condition: service_completed_successfully}
+      mcp: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      start_period: 60s
+      start_interval: 2s
+      interval: 30s
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.11.8-alpine
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  qdrant-data:
+  caddy-data:

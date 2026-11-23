@@ -8,8 +8,8 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 BUILT := setup lint test data-check kb-numbers up down dev test-int migrate seed kb-load \
-	record-llm llm-requests eval eval-attacks leak-scan models mcp mcp-smoke retention web-types
-NOT_IMPLEMENTED := test-e2e \
+	record-llm llm-requests eval eval-attacks leak-scan models mcp mcp-smoke retention web-types test-e2e load-smoke
+NOT_IMPLEMENTED := \
 	eval-smoke eval-report \
 	export-review-candidates rollback
 
@@ -175,6 +175,24 @@ retention:
 	if [ -z "$$token" ]; then echo "make retention: set JOBS_TOKEN in .env"; exit 1; fi; \
 	curl -fsS -X POST -H "Authorization: Bearer $$token" \
 		"$${API_URL:-http://localhost:8000}/api/v1/admin/jobs/retention"; echo
+
+# Playwright against the built web app served by the API, with fake models (P10-05). Its own compose
+# project (infra/compose.e2e.yml: port 8100, own volumes, test settings, no `.env`), set up with
+# migrations, seed and KB, removed afterwards (KEEP=1 keeps it running).
+E2E := docker compose -p support-hub-e2e -f infra/docker-compose.yml -f infra/compose.e2e.yml
+test-e2e:
+	pnpm -C apps/web build
+	$(E2E) up --detach --build --wait
+	$(E2E) exec -T api sh -c 'alembic -c infra/alembic.ini upgrade head && python -m hub.seed data/seed && python -m hub.kb.service data/kb'
+	pnpm -C apps/web exec playwright test; status=$$?; \
+	if [ -z "$(KEEP)" ]; then $(E2E) down --volumes; fi; exit $$status
+
+# Load smoke (P10-08): 10 parallel customers, 50 tickets, against a running stack with FAKE models
+# only (no model cost). Default target: the e2e stack (`make test-e2e KEEP=1` first). Prints
+# p50/p95 latency, the error rate and any ticket left in `processing` (a lost run).
+load-smoke:
+	uv run python infra/load/smoke.py --url $${URL:-http://localhost:8100} \
+		--access-code $${ACCESS_CODE:-e2e-access-code}
 
 # Judge a finished RAG run again with the active judge prompts (judge calls only, P7-06):
 # RUN=evals/runs/<dir> writes <dir>-rejudged. Real models cost money: by hand.

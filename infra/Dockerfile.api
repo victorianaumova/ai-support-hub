@@ -1,21 +1,31 @@
 # syntax=docker/dockerfile:1
-# Dev image for the `api` service of infra/docker-compose.yml: dependencies are baked in, the
-# source is bind-mounted and uvicorn reloads on change. The production image (multi-stage, built
-# web app, only runtime files) is written in phase 10 (docs/operations.md §6).
-FROM python:3.13.18-slim-trixie
+# The API image (operations §6). Targets:
+#   dev  — the `api` service of infra/docker-compose.yml: dependencies baked in, the source is
+#          bind-mounted and uvicorn reloads on change.
+#   prod — the deployable image (default target): the built web app, the local embedding model
+#          (the container needs no network for embeddings, ADR-0018), only runtime files,
+#          non-root. No test fixtures: production runs real models (`LLM_MODE=real`).
 
+# --- web app build ------------------------------------------------------------------------------
+FROM node:24.22.2-trixie-slim AS web
+WORKDIR /web
+# pnpm from the `packageManager` field of package.json (corepack ships with Node 24).
+COPY apps/web/package.json apps/web/pnpm-lock.yaml apps/web/.npmrc ./
+RUN corepack enable && pnpm install --frozen-lockfile
+COPY apps/web/ ./
+RUN pnpm build
+
+# --- Python dependencies ------------------------------------------------------------------------
+FROM python:3.13.18-slim-trixie AS base
 # Keep equal to UV_VERSION in .github/workflows/ci.yml.
 COPY --from=ghcr.io/astral-sh/uv:0.11.8 /uv /usr/local/bin/uv
-
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH=/app/.venv/bin:$PATH
-
 WORKDIR /app
-
 # Dependencies first: this layer is rebuilt only when a lock or pyproject file changes.
 # `uv sync --locked` needs every workspace member's pyproject to check the lock file.
 COPY uv.lock pyproject.toml ./
@@ -25,14 +35,53 @@ COPY evals/pyproject.toml evals/pyproject.toml
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --package support-hub-api --no-install-workspace
 
+# --- dev ----------------------------------------------------------------------------------------
+FROM base AS dev
 # The package itself, installed editable; compose mounts the live source over apps/api/src.
 COPY apps/api/src apps/api/src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --package support-hub-api
-
 RUN useradd --system --uid 10001 --no-create-home hub
 USER hub
-
 EXPOSE 8000
 CMD ["uvicorn", "hub.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", \
      "--reload", "--reload-dir", "/app/apps/api/src"]
+
+# --- the local embedding model (needs the network once, at build time) -------------------------
+FROM base AS build
+COPY apps/api/src apps/api/src
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-editable --package support-hub-api
+# `make models`: downloads the model and the BM25 files and checks the pinned SHA-256.
+RUN EMBEDDING_CACHE_DIR=/models python -m hub.llm.local_embedding && chmod -R a+rX /models
+
+# --- prod (default) -----------------------------------------------------------------------------
+FROM python:3.13.18-slim-trixie AS prod
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH=/app/.venv/bin:$PATH \
+    APP_ENV=demo \
+    LLM_MODE=real \
+    EMBEDDING_CACHE_DIR=/app/models \
+    WEB_DIST_DIR=/app/web \
+    PORT=8000 \
+    FORWARDED_ALLOW_IPS=127.0.0.1
+WORKDIR /app
+RUN useradd --system --uid 10001 --no-create-home hub
+COPY --from=build /app/.venv /app/.venv
+COPY --from=build /models /app/models
+COPY --from=web /web/dist /app/web
+# Files the app reads at start or on request (operations §2): config, prompts, the KB for
+# `POST /admin/kb/reindex`, the picker list, the migrations, and the committed eval summaries.
+COPY config config
+COPY prompts prompts
+COPY data/kb data/kb
+COPY data/seed data/seed
+COPY infra/alembic.ini infra/alembic.ini
+COPY infra/alembic infra/alembic
+COPY evals/runs evals/runs
+USER hub
+EXPOSE 8000
+# --proxy-headers: behind Cloud Run or Caddy the client IP (rate limits key on it) comes from
+# X-Forwarded-For, trusted only from FORWARDED_ALLOW_IPS (P10-07 sets it for the platform).
+CMD ["sh", "-c", "exec uvicorn hub.main:create_app --factory --host 0.0.0.0 --port \"$PORT\" --proxy-headers --forwarded-allow-ips \"$FORWARDED_ALLOW_IPS\""]
