@@ -62,6 +62,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH=/app/.venv/bin:$PATH \
     APP_ENV=demo \
     LLM_MODE=real \
+    AUTO_REPLY_ALLOWED=false \
     EMBEDDING_CACHE_DIR=/app/models \
     WEB_DIST_DIR=/app/web \
     PORT=8000 \

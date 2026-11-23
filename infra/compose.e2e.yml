@@ -14,6 +14,11 @@ x-test-settings: &test-settings
   CORE_ANCHOR_DATE: "2026-11-12"
   # The highest daily budget: fake-mode calls never count, this only keeps the guard quiet.
   DAILY_BUDGET_USD: "1.00"
+  # Test stack only (fake models): the UI §6 scenarios switch auto-reply on and off, which the
+  # deployment lock (security G5, ADR-0019) refuses while false. Production keeps it false
+  # (compose.prod.yml, the prod image, deploy.yml); the 409 is covered by
+  # integration/test_metrics_api.py::test_switching_auto_reply_on_is_refused_while_the_deployment_does_not_allow_it.
+  AUTO_REPLY_ALLOWED: "true"
 
 services:
   postgres:

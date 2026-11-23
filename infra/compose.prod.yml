@@ -32,6 +32,8 @@ x-hub-env: &hub-env
     # The production budget guard (owner decision, operations §6).
     DAILY_BUDGET_USD: ${DAILY_BUDGET_USD:-0.20}
     LLM_MODE: ${LLM_MODE:-real}
+    # The auto-reply lock (security G5, ADR-0019): a literal, so no .env can switch it on.
+    AUTO_REPLY_ALLOWED: "false"
     # Only Caddy talks to the API; it sets X-Forwarded-For.
     FORWARDED_ALLOW_IPS: "*"
 
