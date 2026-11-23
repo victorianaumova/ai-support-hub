@@ -70,6 +70,8 @@ class Settings(BaseSettings):
 
     mcp_server_url: str = "http://localhost:8001/mcp"
     mcp_server_token: SecretStr = SecretStr("")
+    # Cloud Run: the MCP service URL as the audience of a Google ID token (P10-07); empty locally.
+    mcp_server_audience: str = ""
 
     # Jira and Slack are mocks inside the MCP server; there is no real mode (ADR-0019, P7-02).
     jira_mode: Literal["mock"] = "mock"

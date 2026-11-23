@@ -676,6 +676,48 @@ def test_the_per_ip_message_limit_holds_across_sessions(
     assert _sql(api_db, "SELECT count(*) FROM tickets") == [(3,)]
 
 
+def test_a_replayed_idempotency_key_does_not_use_up_the_limit(
+    app_client: TestClient,
+    app_container: Container,
+    api_db: tuple[str, str],
+    customers: dict[str, uuid.UUID],
+) -> None:
+    """P10-07 (from the P2-06 review): retries after a network drop are free; new messages
+    still count."""
+    app_container.rate_limits.messages_per_session = RateLimiter(2, 60)
+    client = _login(app_client)
+    key = _key()
+    first = client.post("/api/v1/tickets", json={"message": "Where is my money?"}, headers=key)
+    assert first.status_code == 200
+    for _ in range(3):
+        replay = client.post("/api/v1/tickets", json={"message": "Where is my money?"}, headers=key)
+        assert replay.status_code == 200
+    assert (
+        client.post("/api/v1/tickets", json={"message": "second"}, headers=_key()).status_code
+        == 200
+    )
+    third = client.post("/api/v1/tickets", json={"message": "third"}, headers=_key())
+    assert third.status_code == 429
+    assert _sql(api_db, "SELECT count(*) FROM tickets") == [(2,)]
+
+
+def test_4000_escaped_emoji_reach_the_length_check_not_the_body_cap(
+    app_client: TestClient, customers: dict[str, uuid.UUID]
+) -> None:
+    """P10-07 (from the P2-06 review): 12 bytes per JSON-escaped emoji, about 48 KB."""
+    client = _login(app_client)
+    escaped = "\\ud83d\\ude00"
+    for count, expected in ((4_000, 200), (4_001, 422)):
+        body = '{"message": "' + escaped * count + '"}'
+        assert len(body.encode()) > 32 * 1024
+        response = client.post(
+            "/api/v1/tickets",
+            content=body.encode(),
+            headers={**_key(), "Content-Type": "application/json"},
+        )
+        assert response.status_code == expected, response.text[:200]
+
+
 def test_placeholder_text_does_not_promise_an_ai_answer() -> None:
     assert "AI" not in tickets_module.PLACEHOLDER_TEXT
 

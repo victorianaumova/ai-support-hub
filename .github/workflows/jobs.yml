@@ -1,0 +1,45 @@
+# Scheduled work of the demo (operations §6, P8-05, P10-07): Cloud Run gives CPU only during a
+# request, so GitHub Actions calls the job endpoints. Skipped while the repository variable
+# DEMO_URL is empty (before human gate H8).
+name: jobs
+
+on:
+  schedule:
+    - cron: "17 * * * *" # hourly: close-stale, recover-runs
+    - cron: "43 2 * * *" # nightly: retention
+    - cron: "5 6 */3 * *" # every 3 days: ping (keeps Neon and the Qdrant free cluster awake)
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Job to run now"
+        required: true
+        type: choice
+        options: [close-stale, recover-runs, retention, ping]
+
+permissions: {}
+
+jobs:
+  run:
+    if: vars.DEMO_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Call the job endpoints
+        env:
+          DEMO_URL: ${{ vars.DEMO_URL }}
+          JOBS_TOKEN: ${{ secrets.JOBS_TOKEN }}
+          SCHEDULE: ${{ github.event.schedule }}
+          CHOSEN: ${{ inputs.job }}
+        run: |
+          case "$SCHEDULE" in
+            "17 * * * *") jobs="close-stale recover-runs" ;;
+            "43 2 * * *") jobs="retention" ;;
+            "5 6 */3 * *") jobs="ping" ;;
+            *) jobs="$CHOSEN" ;;
+          esac
+          for job in $jobs; do
+            echo "job $job"
+            curl -fsS --max-time 300 -X POST -H "Authorization: Bearer $JOBS_TOKEN" \
+              "$DEMO_URL/api/v1/admin/jobs/$job"
+            echo
+          done

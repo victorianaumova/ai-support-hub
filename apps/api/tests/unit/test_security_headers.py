@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 from starlette.types import Receive, Scope, Send
 
+from hub.api.limits import MAX_BODY_BYTES
 from hub.api.security_headers import (
     CONTENT_SECURITY_POLICY,
     DOCS_CONTENT_SECURITY_POLICY,
@@ -72,7 +73,9 @@ def test_every_answer_carries_the_headers(make_client: MakeClient, path: str, st
 
 def test_a_413_of_the_body_cap_carries_the_headers(make_client: MakeClient) -> None:
     response = make_client().post(
-        "/api/v1/tickets", content=b"x" * 40_000, headers={"Content-Type": "application/json"}
+        "/api/v1/tickets",
+        content=b"x" * (MAX_BODY_BYTES + 1),
+        headers={"Content-Type": "application/json"},
     )
     assert response.status_code == 413
     assert response.headers["content-security-policy"] == CONTENT_SECURITY_POLICY

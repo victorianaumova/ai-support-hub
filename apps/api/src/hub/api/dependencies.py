@@ -71,7 +71,8 @@ CustomerDep = Annotated[Customer, Depends(current_customer)]
 
 
 def client_ip(request: Request) -> str:
-    # Behind Cloud Run the proxy address is replaced by uvicorn's --proxy-headers (deploy task).
+    # Behind Cloud Run or Caddy, uvicorn --proxy-headers puts the client from X-Forwarded-For here
+    # (trusted only from FORWARDED_ALLOW_IPS; the production image sets both, P10-06/P10-07).
     return request.client.host if request.client else "unknown"
 
 

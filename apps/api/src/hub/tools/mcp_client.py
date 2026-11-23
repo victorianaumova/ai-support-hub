@@ -43,6 +43,7 @@ from hub.db.session import Database
 from hub.domain.enums import ActorType, ToolCallStatus, ToolNode
 from hub.guardrails.masking import mask_text
 from hub.observability.tracing import Tracer
+from hub.tools.cloud_identity import IdentityToken
 from hub.tools.permissions import (
     MAX_NAME_LENGTH,
     Allowed,
@@ -82,14 +83,19 @@ class ToolTransport(Protocol):
 
 
 class McpTransport:
-    """Streamable HTTP to the server at `url` with `Authorization: Bearer <token>`."""
+    """Streamable HTTP to the server at `url` with `Authorization: Bearer <token>`, plus a Google
+    ID token in `X-Serverless-Authorization` when the server runs on Cloud Run
+    (`hub.tools.cloud_identity`, P10-07)."""
 
-    def __init__(self, url: str, token: str) -> None:
+    def __init__(self, url: str, token: str, identity: IdentityToken | None = None) -> None:
         self._url = url
         self._token = token
+        self._identity = identity
 
     async def call(self, name: str, arguments: dict[str, Any], timeout_s: float) -> TransportResult:
         headers = {"Authorization": f"Bearer {self._token}"}
+        if self._identity is not None:
+            headers |= await self._identity.headers()
         http = httpx2.AsyncClient(headers=headers, timeout=httpx2.Timeout(timeout_s))
         transport = streamable_http_client(self._url, http_client=http)
         async with http, Client(transport, read_timeout_seconds=timeout_s) as client:

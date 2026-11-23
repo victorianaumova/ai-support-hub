@@ -3,13 +3,15 @@
 The body cap runs before anything parses the request. Masking (G1) is synchronous CPU work,
 about 12 ms per KB of digit-heavy text, so a large body must be refused before it reaches the
 mask; the 4,000-character limit of a message is checked by the request schema, which also runs
-before the mask. The cap leaves room for a 4,000-character message whose every character is
-JSON-escaped (`\\uXXXX`, 6 bytes) plus the other fields.
+before the mask. The cap leaves room for a 4,000-character message whose every character is a
+JSON-escaped surrogate pair (an emoji written as `\\ud83d\\ude00`, 12 bytes: about 48 KB) plus
+the other fields, so such a message reaches the 4,000-character check (422) instead of a 413
+(P10-07, from the P2-06 review). Masking costs at most 4,000 characters either way.
 
 The rate limiter keeps its windows in process memory. With more than one instance each one
-counts on its own, so the real limit is (instances x limit); Cloud Run runs at most 2
-(docs/operations.md §6). Accepted for the demo; the fix is listed under the deploy task in
-docs/build-plan.md.
+counts on its own, so the deployment runs **one** instance at most (Cloud Run `max-instances 1`,
+operations §6; P10-07 decision): the limits of api.md §1 then hold exactly. Behind a proxy the
+client IP comes from `X-Forwarded-For`, which uvicorn trusts only from `FORWARDED_ALLOW_IPS`.
 """
 
 import time
@@ -21,7 +23,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from hub.api.errors import problem_response
 
-MAX_BODY_BYTES = 32 * 1024
+MAX_BODY_BYTES = 64 * 1024
 MAX_MESSAGE_CHARS = 4_000
 
 _METHODS_WITH_BODY = frozenset({"POST", "PUT", "PATCH"})

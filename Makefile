@@ -8,10 +8,10 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 BUILT := setup lint test data-check kb-numbers up down dev test-int migrate seed kb-load \
-	record-llm llm-requests eval eval-attacks leak-scan models mcp mcp-smoke retention web-types test-e2e load-smoke
+	record-llm llm-requests eval eval-attacks leak-scan models mcp mcp-smoke retention web-types test-e2e load-smoke rollback
 NOT_IMPLEMENTED := \
 	eval-smoke eval-report \
-	export-review-candidates rollback
+	export-review-candidates
 
 .PHONY: eval-rejudge help $(BUILT) $(NOT_IMPLEMENTED)
 
@@ -194,6 +194,11 @@ test-e2e:
 load-smoke:
 	uv run python infra/load/smoke.py --url $${URL:-http://localhost:8100} \
 		--access-code $${ACCESS_CODE:-e2e-access-code}
+
+# Cloud Run (P10-07): send hub-api's traffic back to the revision before the current one. Needs
+# gcloud logged in and GCP_PROJECT_ID, GCP_REGION set.
+rollback:
+	infra/deploy/rollback.sh
 
 # Judge a finished RAG run again with the active judge prompts (judge calls only, P7-06):
 # RUN=evals/runs/<dir> writes <dir>-rejudged. Real models cost money: by hand.
