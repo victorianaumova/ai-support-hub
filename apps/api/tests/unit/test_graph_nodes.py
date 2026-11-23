@@ -114,6 +114,7 @@ def _pipeline(
     variant: str = VARIANT,
     retriever: FakeSearch | None = None,
     recorder: MemoryRecorder | None = None,
+    auto_reply_allowed: bool = True,
 ) -> Pipeline:
     models = real_models()
     return Pipeline(
@@ -127,6 +128,7 @@ def _pipeline(
         verify_prompt=active_prompt(PROMPTS, models, "verify") if variant != B0_VARIANT else None,
         variant=variant,
         retriever=retriever,
+        auto_reply_allowed=auto_reply_allowed,
     )
 
 
@@ -876,6 +878,21 @@ async def test_decide_auto_replies_only_when_the_settings_allow_it(
     _settings(monkeypatch, {})  # missing settings: the safe side
     update = await decide.run(_verified(), _ctx())
     assert (update["route"], update["route_reasons"]) == ("approval", ["auto_reply_off"])
+
+
+async def test_decide_never_auto_replies_while_the_deployment_does_not_allow_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ADR-0019 (owner decision, P10-02): with AUTO_REPLY_ALLOWED off, a stored
+    `auto_reply_enabled: true` is ignored and the draft goes to an operator."""
+    _settings(monkeypatch, AUTO_REPLY_ON)
+    update = await decide.run(_verified(), _ctx(_pipeline(auto_reply_allowed=False)))
+    assert (update["route"], update["route_reasons"]) == ("approval", ["auto_reply_off"])
+
+
+def test_the_pipeline_does_not_allow_auto_reply_by_default() -> None:
+    defaults = {f.name: f.default for f in dataclasses.fields(Pipeline)}
+    assert defaults["auto_reply_allowed"] is False
 
 
 async def test_decide_sends_an_unverified_draft_to_approval(

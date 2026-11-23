@@ -37,6 +37,15 @@ def test_env_example_loads_as_settings() -> None:
     assert settings.core_anchor_date is None  # `CORE_ANCHOR_DATE=` means "not set"
 
 
+def test_the_budget_and_the_auto_reply_lock_default_to_the_safe_side() -> None:
+    """Owner decision (P10-02): $0.20 a day (operations §6) and auto-reply locked off
+    (ADR-0019) unless the deployment sets otherwise."""
+    settings = Settings(_env_file=None)
+    assert settings.daily_budget_usd == 0.20
+    assert settings.auto_reply_allowed is False
+    assert Settings(_env_file=ENV_EXAMPLE).auto_reply_allowed is False
+
+
 def test_unknown_name_in_env_file_fails(tmp_path: Path) -> None:
     env = _write_env(tmp_path, "DATBASE_URL=postgresql+psycopg://x@y/z\n")
     with pytest.raises(ValidationError, match="datbase_url"):

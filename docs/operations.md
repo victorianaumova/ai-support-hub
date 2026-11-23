@@ -67,7 +67,8 @@ All settings are environment variables read by one Pydantic `Settings` class (`h
 | `DEMO_CUSTOMERS_FILE` | `data/seed/demo_customers.json` | the chat's customer picker (`GET /demo/customers`, P10-02); compose mounts it read-only, the API image copies it (P10-06) |
 | `SEED_OPERATOR_PASSWORD` | | used by `make seed` |
 | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` | | tracing is off when empty |
-| `DAILY_BUDGET_USD` | `0.50` | start value of the setting |
+| `DAILY_BUDGET_USD` | `0.20` | start value of the setting (the production guard, §6) |
+| `AUTO_REPLY_ALLOWED` | `false` | deployment lock on auto-reply ([ADR-0019](adr/0019-scope-cuts.md), [security](security.md) §3 G5): while false a lead cannot switch auto-reply on and the graph sends every draft to an operator |
 | `EVAL_MAX_COST_USD` | `1.00` | hard stop for one evaluation run |
 | `EVAL_TRACE_SAMPLE` | `0.2` | share of evaluation runs sent to Langfuse |
 | `EVAL_RUNS_DIR` | `evals/runs` | committed evaluation runs; `GET /console/evals/latest` reads the newest clean real-model run here (the API image must contain the folder, P10-06) |
@@ -145,7 +146,7 @@ flowchart LR
 | Vector search | Qdrant Cloud free cluster (1 GB RAM) | free | Checked 2026-11: a free cluster is suspended after 1 week without use and deleted after 4 weeks. A scheduled GitHub Action calls the `ping` job every 3 days. If the cluster is lost, `make kb-load` rebuilds it in minutes. |
 | Tracing | Langfuse Cloud free plan | free | Checked 2026-11: 50,000 units per month, 30 days of data. Full evaluation runs can use this up — tracing of eval runs is sampled (`EVAL_TRACE_SAMPLE`, default 0.2). |
 | Images | Artifact Registry or GitHub Container Registry | free at this size | |
-| Model calls | Anthropic API (the only provider, ADR-0018) | pay per use | The only real cost. About $5 for the whole project. **Production daily budget guard: $0.20** (owner decision, 2026-11-23): the deployment sets `DAILY_BUDGET_USD=0.20`, and the seeded `daily_budget_usd` setting starts at that value; a lead may lower it in the console. The local default stays $0.50. Embeddings run inside the API container (the image contains the model). |
+| Model calls | Anthropic API (the only provider, ADR-0018) | pay per use | The only real cost. About $5 for the whole project. **Production daily budget guard: $0.20** (owner decision, 2026-11-23): `DAILY_BUDGET_USD` defaults to 0.20 in the code and in `.env.example` (owner decision, P10-02), and the seeded `daily_budget_usd` setting starts at that value; a lead may lower it in the console. Embeddings run inside the API container (the image contains the model). |
 
 Free tiers change. **Before phase 10 the builder checks the current limits on the official pricing pages and updates this table.** Everything runs in standard containers with standard Postgres and Qdrant, so the fallback is simple: one small VPS with the same `docker-compose.yml` plus Caddy for HTTPS (`infra/compose.prod.yml` is kept working for this).
 
