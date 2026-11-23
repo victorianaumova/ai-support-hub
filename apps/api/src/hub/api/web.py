@@ -15,8 +15,13 @@ from fastapi.staticfiles import StaticFiles
 
 from hub.api.errors import ProblemError
 
-# Paths the app answers itself; the page never replaces them.
-RESERVED = ("api/", "health", "ready", "docs", "redoc", "openapi.json")
+# Paths the app answers itself; the page never replaces them. Matched as whole path segments, so
+# `/healthcheck` or `/ready-x` are pages, while `/api/x` and `/docs/x` stay JSON 404s.
+RESERVED = ("api", "health", "ready", "docs", "redoc", "openapi.json")
+
+
+def is_reserved(path: str) -> bool:
+    return any(path == name or path.startswith(f"{name}/") for name in RESERVED)
 
 
 def mount_web(app: FastAPI, dist: Path) -> None:
@@ -30,7 +35,7 @@ def mount_web(app: FastAPI, dist: Path) -> None:
 
     @app.get("/{path:path}", include_in_schema=False)
     async def web_page(path: str) -> FileResponse:
-        if path.startswith(RESERVED):
+        if is_reserved(path):
             raise ProblemError(404, "not_found", "Not found.")
         if path and "/" not in path:
             candidate = (root / path).resolve()

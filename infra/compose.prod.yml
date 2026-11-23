@@ -1,11 +1,21 @@
-# Single-host production stack (operations §6, the fallback to Cloud Run; P10-06):
-#   docker compose -f infra/compose.prod.yml up --build
-# serves the whole app (API + built web app) on ONE port through Caddy: 80 by default, or HTTPS
-# for SITE_ADDRESS. Secrets come from ../.env (SESSION_SECRET, DEMO_ACCESS_CODE, JOBS_TOKEN,
-# MCP_SERVER_TOKEN, SEED_OPERATOR_PASSWORD, ANTHROPIC_API_KEY, POSTGRES_PASSWORD); nothing is baked
-# into an image. Only Caddy publishes a port: Postgres is reachable only on the stack's own network,
-# where the app role keeps the init script's password (infra/postgres/init/02-app-user.sql; change
-# it with ALTER ROLE and DATABASE_URL on a real host).
+# Single-host production stack (operations §6, the fallback to Cloud Run; P10-06), from the repo root:
+#   docker compose --env-file .env -f infra/compose.prod.yml up --build
+# (from infra/: `--env-file ../.env`). `--env-file` is required: the ${...} values below are filled
+# in by compose from the shell or that file, NOT from `env_file:` (which only sets a container's
+# environment) and not from the repo-root .env by default. Without it the database URL falls back
+# to the password `hub` while Postgres gets the real one from env_file, and setup fails.
+# Secrets in .env (POSTGRES_PASSWORD is required): SESSION_SECRET, DEMO_ACCESS_CODE, JOBS_TOKEN,
+# MCP_SERVER_TOKEN, SEED_OPERATOR_PASSWORD, ANTHROPIC_API_KEY; nothing is baked into an image.
+#
+# Ports: only Caddy publishes ports. The default (no SITE_ADDRESS) is plain HTTP for a local check
+# on http://localhost:${HTTP_PORT:-8080}. For a real domain set SITE_ADDRESS=hub.example.com,
+# HTTP_PORT=80 and HTTPS_PORT=443, and point the domain's DNS at the host: Caddy needs both ports
+# reachable to get the certificate (ACME HTTP-01 / TLS-ALPN) and to redirect HTTP to HTTPS.
+#
+# TODO(P10-07): the app role `hub_api` still has the init script's password `hub_api`
+# (infra/postgres/init/02-app-user.sql), hardcoded in DATABASE_URL below. Postgres is not
+# published, but on a real host set it from a secret: ALTER ROLE hub_api PASSWORD ..., and
+# DATABASE_URL from .env / Secret Manager.
 name: support-hub-prod
 
 x-hub-env: &hub-env
@@ -13,6 +23,7 @@ x-hub-env: &hub-env
     - path: ../.env
       required: false
   environment:
+    # TODO(P10-07): app role password from a secret (see the header).
     DATABASE_URL: postgresql+psycopg://hub_api:hub_api@postgres:5432/hub
     DATABASE_URL_DIRECT: postgresql+psycopg://hub:${POSTGRES_PASSWORD:-hub}@postgres:5432/hub
     EVAL_DATABASE_URL: ""
@@ -27,9 +38,12 @@ x-hub-env: &hub-env
 services:
   postgres:
     image: postgres:17.12-alpine
+    # POSTGRES_PASSWORD comes from .env; `environment` would override it, so it is not repeated here.
+    env_file:
+      - path: ../.env
+        required: false
     environment:
       POSTGRES_USER: hub
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hub}
       POSTGRES_DB: hub
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -110,11 +124,13 @@ services:
 
   caddy:
     image: caddy:2.11.8-alpine
-    environment:
-      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    # SITE_ADDRESS comes from .env; the Caddyfile defaults it to `:80` (plain HTTP).
+    env_file:
+      - path: ../.env
+        required: false
     ports:
       - "${HTTP_PORT:-8080}:80"
-      - "443:443"
+      - "${HTTPS_PORT:-8443}:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

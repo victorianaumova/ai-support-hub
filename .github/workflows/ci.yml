@@ -171,6 +171,12 @@ jobs:
       # (a new member, a moved pyproject) would only show up at `make dev`.
       - name: Build the api dev image
         run: docker compose -f infra/docker-compose.yml build api
+      # The prod targets are what the VPS fallback and the deploy run (P10-06); build both so a
+      # broken prod stage (web build, model download, copied paths) fails here, not at deploy.
+      - name: Build the prod images
+        run: |
+          docker build -f infra/Dockerfile.api --target prod -t hub-api:ci .
+          docker build -f infra/Dockerfile.mcp --target prod -t hub-mcp:ci .
 
   data-check:
     runs-on: ubuntu-latest
