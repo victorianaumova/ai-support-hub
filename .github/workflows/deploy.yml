@@ -96,7 +96,7 @@ jobs:
             --image "$REGISTRY/hub-api:$TAG" --allow-unauthenticated \
             --service-account "hub-api@$PROJECT.iam.gserviceaccount.com" \
             --min-instances 0 --max-instances 1 --cpu 1 --memory 1Gi --concurrency 20 \
-            --set-env-vars "MCP_SERVER_URL=$mcp_url/mcp,MCP_SERVER_AUDIENCE=$mcp_url,QDRANT_URL=$QDRANT_URL,DAILY_BUDGET_USD=0.20,FORWARDED_ALLOW_IPS=*,EVAL_DATABASE_URL=" \
+            --set-env-vars "MCP_SERVER_URL=$mcp_url/mcp,MCP_SERVER_AUDIENCE=$mcp_url,QDRANT_URL=$QDRANT_URL,DAILY_BUDGET_USD=0.20,AUTO_REPLY_ALLOWED=false,FORWARDED_ALLOW_IPS=*,EVAL_DATABASE_URL=" \
             --set-secrets "DATABASE_URL=database-url:latest,SESSION_SECRET=session-secret:latest,DEMO_ACCESS_CODE=demo-access-code:latest,JOBS_TOKEN=jobs-token:latest,MCP_SERVER_TOKEN=mcp-server-token:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,QDRANT_API_KEY=qdrant-api-key:latest" \
             --quiet
           echo "API_URL=$(gcloud run services describe hub-api --project "$PROJECT" --region "$REGION" --format='value(status.url)')" >> "$GITHUB_ENV"
