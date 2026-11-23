@@ -162,7 +162,7 @@ Deployment rules:
 - Secrets in Google Secret Manager (or Cloud Run secrets), never in the image or the repository.
 - Migrations run as a separate step before the new revision gets traffic. Migrations must be backward compatible with the running version.
 - After deploy: smoke check — `/ready`, then one fixed canary ticket through the real pipeline (cost under one cent; `infra/deploy/smoke.py`). A failed check triggers the rollback.
-- Rollback: previous Cloud Run revision gets the traffic again (`make rollback`, `infra/deploy/rollback.sh`; `deploy.yml` does it on its own when the smoke check fails).
+- Rollback: previous Cloud Run revision gets the traffic again (`make rollback`, `infra/deploy/rollback.sh`; `deploy.yml` does it on its own when the smoke check fails). A rollback pins the traffic to that revision; the next deploy moves it back to the latest revision (`update-traffic --to-latest`) before the smoke check.
 - Because Cloud Run gives CPU only during a request, all work happens inside requests ([ADR-0007](adr/0007-in-request-processing-sse.md)). Scheduled work is triggered by GitHub Actions schedules that call `POST /admin/jobs/{name}` with `JOBS_TOKEN`: `close-stale` and `recover-runs` every hour, `retention` every night, `ping` every 3 days. No evaluation runs in GitHub Actions (ADR-0018).
 
 ### First deployment (human gate H8, P10-07)

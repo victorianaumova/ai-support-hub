@@ -111,6 +111,10 @@ jobs:
             --set-env-vars "MCP_SERVER_URL=$mcp_url/mcp,MCP_SERVER_AUDIENCE=$mcp_url,QDRANT_URL=$QDRANT_URL,DAILY_BUDGET_USD=0.20,AUTO_REPLY_ALLOWED=false,FORWARDED_ALLOW_IPS=*,EVAL_DATABASE_URL=,LANGFUSE_HOST=$LANGFUSE_HOST,LANGFUSE_PROJECT_ID=$LANGFUSE_PROJECT_ID" \
             --set-secrets "$secrets" \
             --quiet
+          # A rollback pins traffic to one revision, and `gcloud run deploy` keeps a pinned split:
+          # the new revision would get no traffic and the smoke check would test the old one.
+          gcloud run services update-traffic hub-api --project "$PROJECT" --region "$REGION" \
+            --to-latest --quiet
           echo "API_URL=$(gcloud run services describe hub-api --project "$PROJECT" --region "$REGION" --format='value(status.url)')" >> "$GITHUB_ENV"
 
       - name: Demo data and knowledge base (idempotent)
