@@ -269,6 +269,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/console/kb/documents/{doc_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Kb Document */
+        get: operations["get_kb_document_api_v1_console_kb_documents__doc_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/console/kb/search": {
         parameters: {
             query?: never;
@@ -1156,6 +1173,24 @@ export interface components {
             issue_type: "dispute" | "fraud" | "bug" | "limit_request";
             /** Summary */
             summary: string;
+        };
+        /** KbDocumentOut */
+        KbDocumentOut: {
+            /** Id */
+            id: string;
+            /** Sections */
+            sections: components["schemas"]["HelpSectionOut"][];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Url */
+            url: string;
+            /** Visibility */
+            visibility: string;
         };
         /** LoginIn */
         LoginIn: {
@@ -2199,6 +2234,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvalLatestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_kb_document_api_v1_console_kb_documents__doc_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                doc_id: string;
+            };
+            cookie?: {
+                hub_operator?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KbDocumentOut"];
                 };
             };
             /** @description Validation Error */

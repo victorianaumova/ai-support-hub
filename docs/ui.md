@@ -74,14 +74,16 @@ Three columns on desktop, stacked on mobile.
 
 Keyboard shortcuts: `A` approve, `E` focus the editor, `R` reject, `J`/`K` next/previous ticket.
 
+As built (P10-03, `apps/web/src/console/`): shortcuts do nothing while focus is in a field; `J`/`K` follow the order of the queue tab the operator last opened (kept for the browser tab). Tab counters count the first page (50 rows; "50+" when there are more). The SLA mark uses the support hours of `config/policy.yaml` (Monday–Friday 08:00–20:00, Saturday 10:00–16:00, Europe/Bratislava), counted in 5-minute steps; urgent = urgency `high`. The draft editor is a text area; citation markers become chips in a preview under it (a click opens the source in the right column), and the unsupported claims of the verify step are underlined there. "Low confidence" shows the ticket's confidence; the threshold is a lead setting an operator cannot read, so it is not shown. The *Customer* tab shows the profile the API returns and the core tool calls of the run (limits, cards and transactions are not in the console API). The *Run* tab has no trace link (tracing removed, ADR-0019).
+
 ### Knowledge-base search (`/console/kb`)
 Search field, results with an `internal` / `external` badge, article view.
 
 ## 4. Lead pages
 
-**Dashboard.** Period picker. Cards: tickets, automation share, median time to answer, cost per ticket, budget used today. Charts: routes per day (stacked), route reasons (bars), draft outcomes (approved unchanged / edited / rejected), latency p50/p95 per day, cost by node, feedback. A box "Last evaluation": date, variant, each metric with target, red line and pass/fail. A simple accessible chart library (for example Recharts) is fine.
+**Dashboard.** Period picker. Cards: tickets, automation share, median time to answer, cost per ticket, budget used today. Charts: routes per day (stacked), route reasons (bars), draft outcomes (approved unchanged / edited / rejected), latency p50/p95 per day, cost by node, feedback. A box "Last evaluation": date, variant, each metric with target, red line and pass/fail. A simple accessible chart library (for example Recharts) is fine. (As built, P10-04: no library; bars drawn with plain elements, each chart with its numbers as a table.)
 
-**Settings.** Auto-reply switch (with a confirmation dialog that shows the last evaluation result), confidence threshold slider with the counts from the last evaluation next to it (tickets that would be auto-replied at this threshold, and how many of those were wrong; no risk–coverage curve, because there is no trained model, ADR-0018), daily budget, intent allow-list. Every change asks for a short reason, which goes to the audit log.
+**Settings.** (As built, P10-04: the threshold slider shows no counts, because the committed evaluation report has no per-ticket confidences; a pull request names this gap.) Auto-reply switch (with a confirmation dialog that shows the last evaluation result), confidence threshold slider with the counts from the last evaluation next to it (tickets that would be auto-replied at this threshold, and how many of those were wrong; no risk–coverage curve, because there is no trained model, ADR-0018), daily budget, intent allow-list. Every change asks for a short reason, which goes to the audit log.
 
 ## 5. Audit page
 Table with filters (entity, actor, action, time), a detail drawer with the JSON, and a "Verify chain" button that shows OK or the first broken record.

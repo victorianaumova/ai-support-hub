@@ -4,11 +4,16 @@ import { AREA_ROLES } from "../auth/session";
 import { ConsoleLayout } from "../layouts/ConsoleLayout";
 import { PublicLayout } from "../layouts/PublicLayout";
 import { ChatPage } from "../chat/ChatPage";
+import { AuditPage } from "../console/AuditPage";
+import { DashboardPage } from "../console/DashboardPage";
+import { KbPage } from "../console/KbPage";
+import { QueuePage } from "../console/QueuePage";
+import { SettingsPage } from "../console/SettingsPage";
+import { TicketPage } from "../console/TicketPage";
 import { HelpArticle } from "../help/HelpArticle";
 import { ConsoleLogin } from "../pages/ConsoleLogin";
 import { Landing } from "../pages/Landing";
 import { NotFound } from "../pages/NotFound";
-import { Placeholder } from "../pages/Placeholder";
 import { RouteError } from "./RouteError";
 
 /** Routes of UI §1. */
@@ -33,7 +38,7 @@ export const routes: RouteObject[] = [
         index: true,
         element: (
           <RequireOperator roles={AREA_ROLES.queue}>
-            <Placeholder title="Ticket queue" task="P10-03" />
+            <QueuePage />
           </RequireOperator>
         ),
       },
@@ -41,7 +46,7 @@ export const routes: RouteObject[] = [
         path: "tickets/:id",
         element: (
           <RequireOperator roles={AREA_ROLES.queue}>
-            <Placeholder title="Ticket" task="P10-03" />
+            <TicketPage />
           </RequireOperator>
         ),
       },
@@ -49,7 +54,7 @@ export const routes: RouteObject[] = [
         path: "kb",
         element: (
           <RequireOperator roles={AREA_ROLES.kb}>
-            <Placeholder title="Knowledge base" task="P10-04" />
+            <KbPage />
           </RequireOperator>
         ),
       },
@@ -57,7 +62,7 @@ export const routes: RouteObject[] = [
         path: "dashboard",
         element: (
           <RequireOperator roles={AREA_ROLES.dashboard}>
-            <Placeholder title="Dashboard" task="P10-04" />
+            <DashboardPage />
           </RequireOperator>
         ),
       },
@@ -65,7 +70,7 @@ export const routes: RouteObject[] = [
         path: "settings",
         element: (
           <RequireOperator roles={AREA_ROLES.settings}>
-            <Placeholder title="Settings" task="P10-04" />
+            <SettingsPage />
           </RequireOperator>
         ),
       },
@@ -73,7 +78,7 @@ export const routes: RouteObject[] = [
         path: "audit",
         element: (
           <RequireOperator roles={AREA_ROLES.audit}>
-            <Placeholder title="Audit log" task="P10-04" />
+            <AuditPage />
           </RequireOperator>
         ),
       },

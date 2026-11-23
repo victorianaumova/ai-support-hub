@@ -49,6 +49,14 @@ describe("SafeText: the safe rendering rule (UI §2, P10-05 cases)", () => {
     expect(container.querySelector("sup")?.textContent).toBe("1");
   });
 
+  it("underlines highlighted passages as text", () => {
+    const { container } = render(<SafeText text="Fees are zero. It takes **1 day**." highlights={["Fees are zero.", "<b>"]} highlightTitle="Not supported" />);
+    const mark = container.querySelector("mark");
+    expect(mark?.textContent).toBe("Fees are zero.");
+    expect(mark?.getAttribute("title")).toBe("Not supported");
+    expect(container.querySelector("strong")?.textContent).toBe("1 day");
+  });
+
   it("splits paragraphs and lists", () => {
     expect(blocks("a\nb\n\n- c\n1. d")).toEqual([
       { kind: "paragraph", lines: ["a", "b"] },

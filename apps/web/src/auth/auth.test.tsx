@@ -62,8 +62,7 @@ describe("operator login", () => {
     });
     renderApp("/console/settings");
 
-    await screen.findByRole("heading", { name: "Settings" });
-    await userEvent.click(screen.getByRole("button", { name: "Log out" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Log out" }));
     await waitFor(() => {
       expect(calls.some((c) => c.path === "/api/v1/auth/logout")).toBe(true);
     });

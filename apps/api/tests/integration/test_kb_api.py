@@ -162,6 +162,37 @@ def test_help_hides_internal_and_unknown_articles_alike(
     assert (response.status_code, response.json()["code"]) == (404, "not_found")
 
 
+def test_help_never_says_whether_an_article_is_internal(
+    app: FastAPI, indexed: dict[str, Any]
+) -> None:
+    article = _api.client(app).get("/api/v1/help/withdrawal-times").json()
+    assert "visibility" not in article
+
+
+# --- GET /console/kb/documents/{id} (P10-04) -----------------------------------------------------
+
+
+def test_the_console_shows_internal_articles_to_operators_only(
+    indexed: dict[str, Any], staff: dict[str, TestClient]
+) -> None:
+    response = staff["operator"].get("/api/v1/console/kb/documents/internal-fraud-checklist")
+    assert response.status_code == 200, response.text
+    article = response.json()
+    assert article["visibility"] == "internal"
+    assert article["sections"]
+    external = staff["operator"].get("/api/v1/console/kb/documents/withdrawal-times").json()
+    assert external["visibility"] == "external"
+    missing = staff["operator"].get("/api/v1/console/kb/documents/no-such-article")
+    assert missing.status_code == 404
+    denied = staff["compliance"].get("/api/v1/console/kb/documents/internal-fraud-checklist")
+    assert (denied.status_code, denied.json()["code"]) == (403, "forbidden")
+
+
+def test_the_console_article_needs_a_session(app: FastAPI, indexed: dict[str, Any]) -> None:
+    response = _api.client(app).get("/api/v1/console/kb/documents/withdrawal-times")
+    assert response.status_code == 401
+
+
 # --- GET /console/kb/search ----------------------------------------------------------------------
 
 
