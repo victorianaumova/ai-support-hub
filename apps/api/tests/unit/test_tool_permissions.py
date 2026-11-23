@@ -240,6 +240,14 @@ def test_the_allow_lists() -> None:
     assert ALLOWLIST[ToolNode.INTAKE] == {"core_get_customer"}
     assert ALLOWLIST[ToolNode.HANDOFF_PREP] == {"slack_post_escalation"}
     assert ALLOWLIST[ToolNode.ACT] == {"jira_create_issue"}
+    # The console's account view: read tools only, never a side effect (P10-03 review).
+    assert ALLOWLIST[ToolNode.CONSOLE] == {
+        "core_get_customer",
+        "core_list_transactions",
+        "core_get_cards",
+    }
+    assert not any(TOOLS[name].side_effect for name in ALLOWLIST[ToolNode.CONSOLE])
+    assert MAX_CALLS_PER_RUN[ToolNode.CONSOLE] == 30
     assert set(ALLOWLIST) == set(ToolNode) == set(MAX_CALLS_PER_RUN)
 
 

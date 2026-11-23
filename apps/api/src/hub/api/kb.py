@@ -4,6 +4,8 @@
   target of citation links (`/help/<doc_id>#<anchor>`). Internal and unknown documents → 404,
   the same answer, so the endpoint does not tell which internal ids exist.
 - `GET /console/kb/search` [operator]: hybrid search over every chunk, internal included.
+- `GET /console/kb/documents/{id}` [operator]: one article, internal included, for the KB page
+  (P10-04). Compliance cannot use it, like the search.
 - `POST /admin/kb/reindex` [admin]: reload `data/kb` into Postgres and sync the index (or
   rebuild it with `full=true`); audited as `kb.reindexed`.
 """
@@ -61,6 +63,10 @@ class HelpArticleOut(BaseModel):
     sections: list[HelpSectionOut]
 
 
+class KbDocumentOut(HelpArticleOut):
+    visibility: str
+
+
 class SearchHitOut(BaseModel):
     chunk_id: str
     doc_id: str
@@ -94,25 +100,41 @@ def _kb(services: KbServices | None) -> KbServices:
     return services
 
 
-@help_router.get("/{doc_id}")
-async def get_help_article(doc_id: DocId, session: SessionDep) -> HelpArticleOut:
+async def _article(session: SessionDep, doc_id: str, *, internal: bool) -> KbDocumentOut:
     document = await session.get(KbDocument, doc_id)
-    if document is None or document.visibility != Visibility.EXTERNAL:
+    if document is None or (document.visibility != Visibility.EXTERNAL and not internal):
         raise ProblemError(404, "not_found", "Article not found.")
     chunks = await session.scalars(
         select(KbChunk).where(KbChunk.doc_id == doc_id).order_by(KbChunk.ordinal)
     )
     stored = [StoredChunk(chunk.id, chunk.section, chunk.text) for chunk in chunks]
-    return HelpArticleOut(
+    return KbDocumentOut(
         id=document.id,
         title=document.title,
         url=document.url,
+        visibility=str(document.visibility),
         updated_at=document.updated_at,
         sections=[
             HelpSectionOut(anchor=section.anchor, heading=section.heading, text=section.text)
             for section in sections(document.id, document.title, stored)
         ],
     )
+
+
+@help_router.get("/{doc_id}")
+async def get_help_article(doc_id: DocId, session: SessionDep) -> HelpArticleOut:
+    article = await _article(session, doc_id, internal=False)
+    # The public answer never says an article is internal: the field is left out.
+    return HelpArticleOut(**article.model_dump(exclude={"visibility"}))
+
+
+@console_router.get("/documents/{doc_id}")
+async def get_kb_document(
+    doc_id: DocId,
+    _operator: Annotated[Operator, Depends(RequireRole(OPERATOR))],
+    session: SessionDep,
+) -> KbDocumentOut:
+    return await _article(session, doc_id, internal=True)
 
 
 @console_router.get("/search")

@@ -189,7 +189,7 @@ Request and response bodies are **not** stored here. They are in the trace (mask
 |---|---|---|
 | id | uuid PK | |
 | run_id | uuid FK | |
-| node | text | `intake` \| `research` \| `handoff_prep` \| `act` (P7-04, migration 0012): the node that made the call; the per-run limits count a node's rows |
+| node | text | `intake` \| `research` \| `handoff_prep` \| `act` (P7-04, migration 0012) \| `console` (the console's account view, `GET /console/tickets/{id}/account`, migration 0015; owner decision, PR #66): the node that made the call; the per-run limits count a node's rows |
 | tool | text | e.g. `core_get_transaction`; `search_kb` for the research loop's knowledge-base search (a Hub tool, not on the MCP server) |
 | arguments | jsonb | masked (a `search_kb` query too); for a `denied` call only the argument names (`{"names": [...]}`), so a forged `customer_ref` is never stored; also only the names when the masked values are too long or cannot be stored, and after the customer's erasure (P8-05, which also empties `result_summary`) |
 | result_summary | text | short (300 characters), masked; the safe error text for `error`; for `search_kb` only the hit chunk ids, never chunk text |
@@ -201,7 +201,7 @@ Request and response bodies are **not** stored here. They are in the trace (mask
 | latency_ms | int | |
 | created_at | timestamptz | |
 
-Written by `hub/tools/mcp_client.py` (P7-03, migration 0011; from P7-05 also for the `act` node, the urgent Slack alert of `handoff_prep` and `POST /console/tickets/{id}/actions`, which records under the ticket's latest run), one row per call, allowed or denied by `tools/permissions.py` (G6), each with an audit record `tool.called` or `tool.denied` in the same transaction. Index on `(run_id, node)` (migration 0012): the per-run limit of a node (research 5, the others 1, denied calls included) is counted from these rows, so it holds across a resume or a second session of the run (P7-04). Migration 0012 filled `node` of older rows from their audit record.
+Written by `hub/tools/mcp_client.py` (P7-03, migration 0011; from P7-05 also for the `act` node, the urgent Slack alert of `handoff_prep` and `POST /console/tickets/{id}/actions`, which records under the ticket's latest run), one row per call, allowed or denied by `tools/permissions.py` (G6), each with an audit record `tool.called` or `tool.denied` in the same transaction. Index on `(run_id, node)` (migration 0012): the per-run limit of a node (research 5, console 30, the others 1, denied calls included) is counted from these rows, so it holds across a resume or a second session of the run (P7-04). Migration 0012 filled `node` of older rows from their audit record.
 
 ### customer_memory
 

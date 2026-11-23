@@ -10,6 +10,7 @@ from hub.api.admin_runs import router as admin_runs_router
 from hub.api.admin_settings import router as admin_settings_router
 from hub.api.auth import router as auth_router
 from hub.api.console import router as console_router
+from hub.api.console_account import router as console_account_router
 from hub.api.console_actions import router as console_actions_router
 from hub.api.console_drafts import router as console_drafts_router
 from hub.api.console_metrics import router as console_metrics_router
@@ -85,6 +86,7 @@ def create_app(container: Container | None = None) -> FastAPI:
     app.include_router(console_router)
     app.include_router(console_drafts_router)
     app.include_router(console_actions_router)
+    app.include_router(console_account_router)
     app.include_router(console_metrics_router)
     app.include_router(help_router)
     app.include_router(kb_console_router)

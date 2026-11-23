@@ -220,3 +220,6 @@ class ToolNode(StrEnum):
     RESEARCH = "research"
     HANDOFF_PREP = "handoff_prep"
     ACT = "act"
+    # Not a graph node: the console's account view reads the core tools for an operator
+    # (P10-03 review, `GET /console/tickets/{id}/account`), recorded under the latest run.
+    CONSOLE = "console"

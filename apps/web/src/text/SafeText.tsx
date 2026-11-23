@@ -14,6 +14,41 @@ import type { ReactNode } from "react";
 export interface SafeTextProps {
   text: string;
   renderMarker?: (marker: number, key: string) => ReactNode;
+  /** Exact passages to underline (unsupported claims of the verify step, UI §3). */
+  highlights?: readonly string[];
+  highlightTitle?: string;
+}
+
+interface Inline {
+  renderMarker?: SafeTextProps["renderMarker"] | undefined;
+  highlights: readonly string[];
+  title: string;
+}
+
+/** Plain text with the highlighted passages wrapped; still only text nodes inside. */
+function plain(text: string, key: string, options: Inline): ReactNode[] {
+  const wanted = options.highlights.filter((h) => h.trim() !== "" && text.includes(h));
+  if (wanted.length === 0) return [text];
+  const nodes: ReactNode[] = [];
+  let rest = text;
+  let n = 0;
+  for (;;) {
+    let best: { index: number; passage: string } | null = null;
+    for (const passage of wanted) {
+      const index = rest.indexOf(passage);
+      if (index !== -1 && (best === null || index < best.index)) best = { index, passage };
+    }
+    if (best === null) break;
+    if (best.index > 0) nodes.push(rest.slice(0, best.index));
+    nodes.push(
+      <mark key={`${key}-h${n++}`} title={options.title} className="bg-transparent underline decoration-red-700 decoration-wavy decoration-2">
+        {best.passage}
+      </mark>,
+    );
+    rest = rest.slice(best.index + best.passage.length);
+  }
+  if (rest !== "") nodes.push(rest);
+  return nodes;
 }
 
 type Block =
@@ -66,13 +101,14 @@ export function blocks(text: string): Block[] {
 // `code`, **bold**, *italic*, [n] citation markers — in this order of precedence.
 const INLINE = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\*[^*\s][^*\n]*\*)|(\[(\d{1,2})\])/g;
 
-function inline(text: string, keyPrefix: string, renderMarker?: SafeTextProps["renderMarker"]): ReactNode[] {
+function inline(text: string, keyPrefix: string, options: Inline): ReactNode[] {
+  const { renderMarker } = options;
   const nodes: ReactNode[] = [];
   let last = 0;
   let n = 0;
   for (const match of text.matchAll(INLINE)) {
     const index = match.index;
-    if (index > last) nodes.push(text.slice(last, index));
+    if (index > last) nodes.push(...plain(text.slice(last, index), `${keyPrefix}-p${n}`, options));
     const key = `${keyPrefix}-${n++}`;
     const [whole, code, bold, italic, , marker] = match;
     if (code !== undefined) nodes.push(<code key={key} className="rounded bg-slate-100 px-1 font-mono text-[0.95em]">{code.slice(1, -1)}</code>);
@@ -81,11 +117,12 @@ function inline(text: string, keyPrefix: string, renderMarker?: SafeTextProps["r
     else if (marker !== undefined) nodes.push(renderMarker ? renderMarker(Number(marker), key) : whole);
     last = index + whole.length;
   }
-  if (last < text.length) nodes.push(text.slice(last));
+  if (last < text.length) nodes.push(...plain(text.slice(last), `${keyPrefix}-end`, options));
   return nodes;
 }
 
-export function SafeText({ text, renderMarker }: SafeTextProps) {
+export function SafeText({ text, renderMarker, highlights = [], highlightTitle = "" }: SafeTextProps) {
+  const options: Inline = { renderMarker, highlights, title: highlightTitle };
   return (
     <div className="space-y-2 break-words">
       {blocks(text).map((block, b) => {
@@ -93,14 +130,14 @@ export function SafeText({ text, renderMarker }: SafeTextProps) {
         if (block.kind === "bullets") {
           return (
             <ul key={key} className="list-disc space-y-1 pl-5">
-              {block.items.map((item, i) => <li key={i}>{inline(item, `${key}-${i}`, renderMarker)}</li>)}
+              {block.items.map((item, i) => <li key={i}>{inline(item, `${key}-${i}`, options)}</li>)}
             </ul>
           );
         }
         if (block.kind === "numbers") {
           return (
             <ol key={key} start={block.start} className="list-decimal space-y-1 pl-5">
-              {block.items.map((item, i) => <li key={i}>{inline(item, `${key}-${i}`, renderMarker)}</li>)}
+              {block.items.map((item, i) => <li key={i}>{inline(item, `${key}-${i}`, options)}</li>)}
             </ol>
           );
         }
@@ -109,7 +146,7 @@ export function SafeText({ text, renderMarker }: SafeTextProps) {
             {block.lines.map((line, i) => (
               <span key={i}>
                 {i > 0 && <br />}
-                {inline(line, `${key}-${i}`, renderMarker)}
+                {inline(line, `${key}-${i}`, options)}
               </span>
             ))}
           </p>
