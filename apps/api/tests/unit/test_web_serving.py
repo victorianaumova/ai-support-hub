@@ -3,8 +3,10 @@
 from pathlib import Path
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from hub.api.web import is_reserved, mount_web
 from hub.config import Settings
 from hub.deps import Container
 from hub.main import create_app
@@ -22,7 +24,20 @@ def client(tmp_path: Path) -> TestClient:
     return TestClient(create_app(Container(settings=settings)))
 
 
-@pytest.mark.parametrize("path", ["/", "/chat", "/console/tickets/abc", "/help/withdrawal-times"])
+# Reserved names match whole path segments only (P10-06 review): `/readyz` is a page, not `/ready`.
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/",
+        "/chat",
+        "/console/tickets/abc",
+        "/help/withdrawal-times",
+        "/readyz",
+        "/healthcheck",
+        "/openapi.jsonx",
+        "/apis",
+    ],
+)
 def test_pages_answer_with_the_app(client: TestClient, path: str) -> None:
     response = client.get(path)
     assert response.status_code == 200
@@ -36,7 +51,7 @@ def test_assets_and_top_level_files_are_served(client: TestClient) -> None:
     assert client.get("/favicon.svg").text == "<svg/>"
 
 
-@pytest.mark.parametrize("path", ["/api/v1/nope", "/api/", "/openapi.jsonx", "/readyz"])
+@pytest.mark.parametrize("path", ["/api/v1/nope", "/api/", "/api", "/docs/nope"])
 def test_api_paths_never_fall_back_to_the_page(client: TestClient, path: str) -> None:
     response = client.get(path)
     assert response.status_code == 404
@@ -57,3 +72,28 @@ def test_health_still_answers(client: TestClient) -> None:
 def test_without_a_build_there_is_no_page(tmp_path: Path) -> None:
     app = create_app(Container(settings=Settings(_env_file=None, app_env="test")))
     assert TestClient(app).get("/chat").status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("path", "reserved"),
+    [
+        ("api", True),
+        ("api/v1/x", True),
+        ("health", True),
+        ("ready", True),
+        ("docs/oauth2-redirect", True),
+        ("openapi.json", True),
+        ("", False),
+        ("ready-x", False),
+        ("healthcheck", False),
+        ("api-docs", False),
+        ("documents", False),
+    ],
+)
+def test_reserved_names_are_whole_segments(path: str, reserved: bool) -> None:
+    assert is_reserved(path) is reserved
+
+
+def test_a_build_without_index_fails_fast(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match=r"no index\.html"):
+        mount_web(FastAPI(), tmp_path)
