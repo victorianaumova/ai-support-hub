@@ -17,7 +17,6 @@ from hub.observability.readiness import (
     mcp_check,
     postgres_check,
     qdrant_check,
-    qdrant_port,
 )
 
 MakeClient = Callable[..., TestClient]
@@ -131,54 +130,23 @@ def _transport(status: int, seen: list[httpx2.Request]) -> httpx2.MockTransport:
     return httpx2.MockTransport(handle)
 
 
-async def test_qdrant_check_calls_readyz() -> None:
-    seen: list[httpx2.Request] = []
-    await qdrant_check("http://qdrant:6333/", transport=_transport(200, seen))()
-    assert str(seen[0].url) == "http://qdrant:6333/readyz"
+async def test_qdrant_check_passes_when_the_kb_client_answers() -> None:
+    calls: list[str] = []
+
+    async def answered() -> str | None:
+        calls.append("collection")
+        return None  # no index yet is still an answer; kb_index reports the counts
+
+    assert await qdrant_check(answered)() is None
+    assert calls == ["collection"]
 
 
-async def test_qdrant_check_sends_no_key_when_none_is_set() -> None:
-    seen: list[httpx2.Request] = []
-    await qdrant_check("http://qdrant:6333", transport=_transport(200, seen))()
-    assert "api-key" not in seen[0].headers
+async def test_qdrant_check_fails_when_the_kb_client_fails() -> None:
+    async def refused() -> str | None:
+        raise RuntimeError("Unexpected Response: 403 (Forbidden)")
 
-
-async def test_qdrant_check_sends_the_api_key() -> None:
-    # Qdrant Cloud answers /readyz with 403 without the key.
-    seen: list[httpx2.Request] = []
-    await qdrant_check("https://x.cloud.qdrant.io", "secret-key", transport=_transport(200, seen))()
-    assert seen[0].headers["api-key"] == "secret-key"
-
-
-@pytest.mark.parametrize(
-    ("url", "expected"),
-    [
-        ("https://x.cloud.qdrant.io", "https://x.cloud.qdrant.io:6333"),
-        ("https://x.cloud.qdrant.io/", "https://x.cloud.qdrant.io:6333"),
-        ("http://qdrant:6333", "http://qdrant:6333"),
-        ("http://localhost:7000/", "http://localhost:7000"),
-    ],
-)
-def test_qdrant_check_uses_the_port_of_the_client(url: str, expected: str) -> None:
-    # qdrant-client talks to 6333 when the URL names no port; the check must call the same.
-    assert qdrant_port(url) == expected
-
-
-async def test_qdrant_check_calls_the_cloud_url_on_6333() -> None:
-    seen: list[httpx2.Request] = []
-    await qdrant_check("https://x.cloud.qdrant.io", "k", transport=_transport(200, seen))()
-    assert str(seen[0].url) == "https://x.cloud.qdrant.io:6333/readyz"
-
-
-@pytest.mark.parametrize("status", [204, 200])
-async def test_qdrant_check_accepts_2xx(status: int) -> None:
-    await qdrant_check("http://qdrant:6333", transport=_transport(status, []))()
-
-
-@pytest.mark.parametrize("status", [301, 401, 404, 503])
-async def test_qdrant_check_fails_on_other_statuses(status: int) -> None:
-    with pytest.raises(UnexpectedStatusError, match=f"HTTP {status}"):
-        await qdrant_check("http://qdrant:6333", transport=_transport(status, []))()
+    with pytest.raises(RuntimeError, match="403"):
+        await qdrant_check(refused)()
 
 
 @pytest.mark.parametrize("status", [200, 202, 400, 405, 406])
