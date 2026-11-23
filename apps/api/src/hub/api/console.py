@@ -83,6 +83,7 @@ from hub.domain.enums import (
 from hub.domain.memory import MEMORY_ITEMS
 from hub.domain.review import ReviewDecision
 from hub.guardrails.masking import mask
+from hub.observability.tracing import trace_url
 
 router = APIRouter(prefix="/api/v1/console", tags=["console"])
 
@@ -315,6 +316,13 @@ async def get_ticket(
         ],
         tool_calls=[ToolCallOut.model_validate(call) for call in tool_calls],
         model_calls=[ModelCallOut.model_validate(call) for call in model_calls],
+        trace_url=None
+        if run is None
+        else trace_url(
+            container.settings.langfuse_host,
+            container.settings.langfuse_project_id,
+            run.trace_id,
+        ),
     )
 
 

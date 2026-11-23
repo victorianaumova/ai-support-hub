@@ -22,6 +22,7 @@ from typing import Any
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from hub.api import tickets as tickets_module
@@ -62,6 +63,7 @@ from hub.llm.gateway import build_gateway, embedder
 from hub.llm.recorder import DbCallRecorder
 from hub.llm.schemas import ProviderRequest, ProviderResponse, Usage
 from hub.main import create_app
+from hub.observability.tracing import Tracer
 
 from ._api import (
     ACCESS_CODE,
@@ -226,6 +228,21 @@ def test_an_operator_approves_the_sepa_draft_and_the_customer_sees_it(
     }
     draft = detail["draft"]
     assert draft["status"] == "pending"
+    # P9-01: every node with its duration; the run waits in human_review. Tracing is off here.
+    paused = [(step["node"], step["outcome"]) for step in detail["latest_run"]["steps"]]
+    assert paused == [
+        ("intake", "ok"),
+        ("triage", "ok"),
+        ("policy_gate", "ok"),
+        ("research", "ok"),
+        ("write", "ok"),
+        ("verify", "ok"),
+        ("decide", "ok"),
+        ("human_review", "paused"),
+    ]
+    assert all(step["duration_ms"] >= 0 for step in detail["latest_run"]["steps"])
+    assert detail["latest_run"]["trace_id"] is None
+    assert detail["trace_url"] is None
 
     response = operator.post(
         f"/api/v1/console/drafts/{draft['id']}/approve",
@@ -234,6 +251,13 @@ def test_an_operator_approves_the_sepa_draft_and_the_customer_sees_it(
     )
 
     assert response.status_code == 200, response.text
+    # The resume appends its own steps to the same run.
+    resumed = operator.get(f"/api/v1/console/tickets/{ticket_id}").json()["latest_run"]
+    assert [(step["node"], step["outcome"]) for step in resumed["steps"]][len(paused) :] == [
+        ("human_review", "ok"),
+        ("act", "ok"),
+        ("respond", "ok"),
+    ]
     messages = customer.get(f"/api/v1/tickets/{ticket_id}/messages").json()["items"]
     sent = messages[-1]
     assert sent["author_label"] == "AI assistant · reviewed by Marta"
@@ -690,6 +714,7 @@ async def _run(
     provider: _Scripted | None = None,
     *,
     search: bool = True,
+    tracer: Tracer | None = None,
 ) -> tuple[RunOutcome, list[tuple[str, dict[str, Any]]]]:
     settings = _settings(urls, qdrant_url)
     database = connect(settings.database_url.get_secret_value())
@@ -698,6 +723,10 @@ async def _run(
     if provider is not None:
         pipeline = dataclasses.replace(
             pipeline, gateway=dataclasses.replace(pipeline.gateway, provider=provider)
+        )
+    if tracer is not None:
+        pipeline = dataclasses.replace(
+            pipeline, tracer=tracer, gateway=dataclasses.replace(pipeline.gateway, tracer=tracer)
         )
     emitted: list[tuple[str, dict[str, Any]]] = []
 
@@ -717,6 +746,39 @@ async def _run(
         await kb.close()
         await database.dispose()
     return outcome, emitted
+
+
+async def test_a_traced_run_stores_its_trace_id_and_traces_every_node(
+    run_db: Urls, qdrant: str
+) -> None:
+    """P9-01: one trace per run, its id on the run row; nodes, model calls and the search in
+    it (exported to memory here, never over the network; the G9 filter: test_tracing.py)."""
+    exporter = InMemorySpanExporter()
+    tracer = Tracer.from_settings(
+        Settings(
+            _env_file=None,
+            app_env="test",
+            langfuse_public_key=f"pk-lf-test-{uuid.uuid4()}",
+            langfuse_secret_key="sk-lf-test",  # noqa: S106 - not a real key
+            langfuse_host="http://127.0.0.1:9",
+        ),
+        span_exporter=exporter,
+    )
+    ticket_id, message_id = _ticket_with_message(run_db, SEPA)
+    outcome, _ = await _run(run_db, qdrant, ticket_id, message_id, tracer=tracer)
+    tracer.flush()
+
+    assert outcome.run_id is not None
+    (trace_id,) = _one(run_db, "SELECT trace_id FROM runs WHERE id = %s", outcome.run_id)
+    assert trace_id == tracer.trace_id(outcome.run_id, "online")
+    spans = exporter.get_finished_spans()
+    assert {span.context.trace_id for span in spans if span.context} == {int(trace_id, 16)}
+    names = {span.name for span in spans}
+    assert {"run.start", "intake", "triage", "research", "write", "verify", "kb_search"} <= names
+    kinds = {str((span.attributes or {}).get("langfuse.observation.type")) for span in spans}
+    # The query embedding is traced in the app (the search uses the pipeline's gateway,
+    # `deps.build_container`); this test's search has a gateway of its own.
+    assert {"generation", "retriever"} <= kinds
 
 
 async def test_a_ticket_claimed_during_the_run_keeps_its_operator(

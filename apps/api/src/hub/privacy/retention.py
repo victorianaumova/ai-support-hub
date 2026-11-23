@@ -7,9 +7,9 @@
 3. The checkpoints of tickets closed more than `RETENTION_CHECKPOINT_DAYS` (7) ago, and of the
    tickets deleted in 1, are returned for the API to delete through the checkpoint store.
 
-Not here: traces (Langfuse was removed, ADR-0019) and the audit log (5 years): the app role
-cannot delete audit rows (security §4), and removing the oldest rows would need the chain to be
-anchored anew, which is outside this job.
+Not here: traces (Langfuse keeps them 30 days and deletes them itself, P9-01) and the audit log
+(5 years): the app role cannot delete audit rows (security §4), and removing the oldest rows
+would need the chain to be anchored anew, which is outside this job.
 """
 
 import uuid

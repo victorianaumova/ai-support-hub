@@ -130,6 +130,14 @@ def test_litellm_rule_has_its_contract() -> None:
     assert contract["allowed_importers"] == ["hub.llm.gateway"]
 
 
+def test_langfuse_rule_has_its_contract() -> None:
+    assert "- Only `observability/tracing.py` imports `langfuse`" in _module_rules()
+    contract = _contracts()["only-tracing-imports-langfuse"]
+    assert contract["type"] == "protected"
+    assert contract["protected_modules"] == ["langfuse"]
+    assert contract["allowed_importers"] == ["hub.observability.tracing"]
+
+
 def test_every_contract_comes_from_a_design_rule() -> None:
     # A contract without a rule in design §8 is a rule nobody agreed to.
     assert set(_contracts()) == {
@@ -138,6 +146,7 @@ def test_every_contract_comes_from_a_design_rule() -> None:
         "api-mcp-independent",
         "evals-mcp-independent",
         "only-gateway-imports-litellm",
+        "only-tracing-imports-langfuse",
     }
 
 
@@ -212,6 +221,19 @@ VIOLATIONS: list[tuple[str, list[Plant], set[str]]] = [
             ("hub", "import litellm"),
             ("hub_evals", "import litellm"),
             ("support_tools", "import litellm"),
+        ]
+    ],
+    *[
+        (
+            f"{package}->langfuse",
+            [(package, statement)],
+            {"only-tracing-imports-langfuse"},
+        )
+        for package, statement in [
+            ("hub/observability", "import langfuse"),  # another module of the same package
+            ("hub/llm", "from langfuse import Langfuse"),
+            ("hub/graph", "import langfuse"),
+            ("hub_evals", "import langfuse"),
         ]
     ],
 ]

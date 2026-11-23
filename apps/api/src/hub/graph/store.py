@@ -5,18 +5,24 @@ The run row is created and committed before the graph starts: the gateway writes
 rows in transactions of their own, and `llm_calls.run_id` refers to `runs.id`.
 """
 
+import logging
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, type_coerce, update
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hub.audit import record
 from hub.db.models import LlmCall, Run, Ticket
 from hub.db.repositories import MessageRepository, TicketRepository
 from hub.domain.enums import ActorType, MessageRole, Route, RunStatus, TicketStatus
+from hub.graph.context import Step
 from hub.graph.pipeline import GRAPH_VERSION, Pipeline
+
+logger = logging.getLogger(__name__)
 
 
 async def ticket(session: AsyncSession, ticket_id: uuid.UUID) -> Ticket:
@@ -52,7 +58,27 @@ async def start_run(
         )
         session.add(run)
         await session.flush()
+        run.trace_id = pipeline.tracer.trace_id(run.id, pipeline.context.value)
         return run.id, found.customer_id
+
+
+async def record_steps(pipeline: Pipeline, run_id: uuid.UUID, steps: Sequence[Step]) -> None:
+    """Append one invoke's steps to `runs.steps` (P9-01). Never raises: the steps are for the
+    console, and the run's outcome is already settled or settles on its own path."""
+    if not steps:
+        return
+    stored = [step.stored() for step in steps]
+    try:
+        async with pipeline.database.sessions.begin() as session:
+            await session.execute(
+                update(Run)
+                .where(Run.id == run_id)
+                .values(steps=Run.steps.op("||")(type_coerce(stored, JSONB)))
+            )
+    except Exception as exc:
+        logger.warning(
+            "run steps not recorded", extra={"run_id": str(run_id), "error": type(exc).__name__}
+        )
 
 
 async def _totals(session: AsyncSession, run_id: uuid.UUID) -> tuple[Decimal, int, int]:

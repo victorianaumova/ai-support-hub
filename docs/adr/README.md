@@ -24,5 +24,6 @@ One file per decision. To change a decision, add a new ADR that replaces the old
 | [0018](0018-budget-mode.md) | Budget mode: Anthropic only, local embeddings, small evaluation (replaces parts of 0003, 0005, 0009, 0013) |
 | [0019](0019-scope-cuts.md) | Scope cuts: phase 9 removed, one review round per pull request, Jira and Slack mock only (replaces parts of 0014, 0018) |
 | [0020](0020-exact-error-code-lookup.md) | Exact error-code lookup in hybrid search (adds to 0005) |
+| [0021](0021-restore-run-tracing.md) | Run tracing with Langfuse is back, P9-01 only (amends 0019, restores the tracing part of 0014) |
 
 Template: Context → Decision → Alternatives considered → Consequences. Half a page.

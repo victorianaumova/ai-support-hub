@@ -56,6 +56,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         await container.runs.wait(timeout_s=RUN_SHUTDOWN_WAIT_S)
         if container.pipeline is not None:
             await container.pipeline.checkpoints.close()
+            await container.pipeline.tracer.aflush()
         if container.kb is not None:
             await container.kb.close()
         if container.database is not None:
