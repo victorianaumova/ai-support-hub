@@ -1,0 +1,52 @@
+{
+  "variant": "rag_hybrid",
+  "llm_mode": "real",
+  "graph_version": "graph-v4",
+  "models": {
+    "triage": [
+      "anthropic/claude-haiku-5-5",
+      "anthropic/claude-sonnet-5-5"
+    ],
+    "write": [
+      "anthropic/claude-haiku-5-5",
+      "anthropic/claude-sonnet-5-5"
+    ],
+    "verify": [
+      "anthropic/claude-haiku-5-5",
+      "anthropic/claude-sonnet-5-5"
+    ],
+    "research": [
+      "anthropic/claude-haiku-5-5",
+      "anthropic/claude-sonnet-5-5"
+    ],
+    "judge": [
+      "anthropic/claude-haiku-5-5",
+      "anthropic/claude-sonnet-5-5"
+    ]
+  },
+  "prompt_versions": {
+    "triage": "v1",
+    "write": "v3",
+    "verify": "v1",
+    "research": "v1"
+  },
+  "git_sha": "4360527",
+  "git_dirty": false,
+  "git_diff_sha256": null,
+  "prompts_sha256": "9534470ef16c399d38a2bdf30993a5cb209695d178d22fe4963630da414cd9c3",
+  "kb_sha256": "2a39ad0dd469b7ea72c27c7581d555c77df0aa99170ca72e79c356311565fe80",
+  "core_anchor_date": "2026-11-12",
+  "account_tools": true,
+  "tickets_file": "data/eval/tickets.dev.jsonl",
+  "tickets_sha256": "be643191909b2c66f196f33d3b424473941268d36e9f0a43f9e47380be51778a",
+  "judge_prompt_versions": {
+    "judge_key_facts": "v1",
+    "judge_faithfulness": "v2",
+    "judge_citation": "v2",
+    "judge_attack": "v1"
+  },
+  "limit": null,
+  "cache": true,
+  "concurrency": 5,
+  "max_cost_usd": "0.19"
+}

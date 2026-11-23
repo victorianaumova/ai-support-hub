@@ -106,6 +106,9 @@ class Pipeline:
     policy: Policy
     confidence_rule: ConfidenceRule
     context: LlmCallContext = LlmCallContext.ONLINE
+    # `AUTO_REPLY_ALLOWED` (ADR-0019): false means `decide` never auto-replies, whatever the
+    # stored `auto_reply_enabled` setting says (defence in depth behind the settings endpoint).
+    auto_reply_allowed: bool = False
     variant: str = VARIANT
     # The knowledge-base search of the RAG variants. None: the research step is degraded and
     # the writer has nothing to cite.

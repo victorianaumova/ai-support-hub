@@ -53,15 +53,20 @@ def runs_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def app(urls: Urls, runs_dir: Path) -> Iterator[FastAPI]:
+def auto_reply_allowed() -> bool:
+    """`AUTO_REPLY_ALLOWED` of the app; a test parametrizes it to switch the lock off."""
+    return False
+
+
+@pytest.fixture
+def app(urls: Urls, runs_dir: Path, auto_reply_allowed: bool) -> Iterator[FastAPI]:
     _api.empty_tables(urls)
     run_sql(urls, "DELETE FROM settings")
     for who, email in EMAILS.items():
         add_operator(urls, email, who, name=who.title())
     base = _api.container(urls)
-    container = dataclasses.replace(
-        base, settings=base.settings.model_copy(update={"eval_runs_dir": runs_dir})
-    )
+    update = {"eval_runs_dir": runs_dir, "auto_reply_allowed": auto_reply_allowed}
+    container = dataclasses.replace(base, settings=base.settings.model_copy(update=update))
     assert isinstance(container, Container)
     application = create_app(container)
     with TestClient(application):
@@ -469,6 +474,7 @@ def _put(client: TestClient, **body: Any) -> Any:  # noqa: ANN401
     return client.put("/api/v1/admin/settings", json=body)
 
 
+@pytest.mark.parametrize("auto_reply_allowed", [True])
 def test_a_lead_changes_settings_and_each_change_is_audited_with_its_reason(
     staff: dict[str, TestClient], urls: Urls
 ) -> None:
@@ -523,6 +529,28 @@ def test_a_lead_changes_settings_and_each_change_is_audited_with_its_reason(
         "reason": "Demo day: tighter budget",
     }
     assert rows[2][2]["old"] == ["payment_pending", "withdrawal_issue"]
+
+
+def test_switching_auto_reply_on_is_refused_while_the_deployment_does_not_allow_it(
+    staff: dict[str, TestClient], urls: Urls
+) -> None:
+    """ADR-0019 (owner decision, P10-02): the whole request is refused, nothing is written."""
+    lead = staff["lead"]
+
+    response = _put(lead, auto_reply_enabled=True, daily_budget_usd=0.1, reason="turn it on")
+
+    assert response.status_code == 409, response.text
+    assert response.json()["code"] == "auto_reply_not_allowed"
+    assert "AUTO_REPLY_ALLOWED" in response.json()["detail"]
+    assert run_sql(urls, "SELECT count(*) FROM settings") == [(0,)]
+    assert run_sql(urls, "SELECT count(*) FROM audit_log WHERE action = 'settings.changed'") == [
+        (0,)
+    ]
+
+    # Switching it off (the kill switch) and other settings stay allowed.
+    off = _put(lead, auto_reply_enabled=False, daily_budget_usd=0.1, reason="keep it off")
+    assert off.status_code == 200, off.text
+    assert off.json()["auto_reply_enabled"] is False
 
 
 def test_the_allow_list_keeps_policy_order_without_duplicates(

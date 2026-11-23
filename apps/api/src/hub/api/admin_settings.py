@@ -9,6 +9,10 @@ A `PUT` changes only the fields it sends and needs a `reason`. Each changed key 
 `settings.changed` audit record with the old and new value and the reason, in the same
 transaction as the change; a field sent with its current value writes nothing. The intent
 allow-list may only remove intents from `auto_reply_allowlist` in `config/policy.yaml`.
+
+Auto-reply can be switched on only where the deployment allows it (`AUTO_REPLY_ALLOWED`,
+ADR-0019): otherwise a `PUT` with `auto_reply_enabled: true` is refused as a whole with
+`409 auto_reply_not_allowed`, and nothing is written. Switching it off is always allowed.
 """
 
 import math
@@ -136,6 +140,12 @@ async def put_settings(
     session: SessionDep,
     container: ContainerDep,
 ) -> SettingsOut:
+    if body.auto_reply_enabled is True and not container.settings.auto_reply_allowed:
+        raise ProblemError(
+            409,
+            "auto_reply_not_allowed",
+            "Auto-reply cannot be switched on in this deployment (AUTO_REPLY_ALLOWED is off).",
+        )
     policy = _policy(container)
     wanted = changes(body, policy)
     repository = SettingsRepository(session)

@@ -226,7 +226,7 @@ Written by `hub/tools/mcp_client.py` (P7-03, migration 0011; from P7-05 also for
 | rating | text | `up` \| `down` |
 | comment | text null | masked |
 
-One feedback per AI message: only the first rating is kept (the API locks the message row, so a double click stores one row). No database constraint enforces this yet (deferred to P10-02).
+One feedback per AI message: only the first rating is kept. The API locks the message row, so a double click stores one row, and the unique constraint `uq_feedback_message_id` (migration 0014, P10-02) makes the database enforce it too; a request that loses a race answers like a repeat.
 
 ### kb_documents and kb_chunks
 Postgres keeps the knowledge base as the source of truth for the index and for the operator UI.
@@ -334,6 +334,7 @@ Rules: one topic per article; 150–600 words; the body starts with a `##` secti
 | `cards.json` | `card_ref` (`CRD-0001`), `customer_ref`, `kind` `virtual`\|`physical`, `last4`, `status` `active`\|`frozen`\|`pin_blocked`\|`cancelled`, `issued_at`, `delivery_status` `ordered`\|`shipped`\|`delivered` and `delivery_method` `standard`\|`express` (physical only) |
 | `transactions.json` | `reference` (`TX-000001`), `customer_ref`, `type`, `amount`, `currency`, `fee`, `fee_currency` (currency of the fee; empty = `currency`; `EUR` for fixed fees on USD or GBP transactions), `status` `pending`\|`held_for_review`\|`completed`\|`failed`\|`returned`, `error_code`, `requested_at`, `status_history` (`[{status, at}]`), `counterparty`, `card_ref` (card payments and ATM withdrawals), `merchant_category` (card payments only) |
 | `operators.json` | `email` (`@tallybridge.example`), `name`, `role` |
+| `demo_customers.json` | the chat's customer picker (P10-02, optional): `customer_ref`, `hint` (≤ 40 characters), `suggestions` (1–4 first messages, ≤ 140 each). Every customer once, from `customers.json`, never a canary customer (CUS-0021, CUS-0023), no card data. Read by `GET /demo/customers` (`DEMO_CUSTOMERS_FILE`); shown to customers, so hints describe only what the customer can see (never `restriction_reason` or `support_scenarios`) |
 
 Rules that matter outside the schema:
 - Amounts are JSON strings with two decimals (exact, no float rounding).

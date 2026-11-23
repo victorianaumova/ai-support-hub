@@ -78,12 +78,19 @@ class Settings(BaseSettings):
     session_secret: SecretStr = SecretStr("")
     demo_access_code: SecretStr = SecretStr("")
     seed_operator_password: SecretStr = SecretStr("")
+    # The chat's customer picker: which demo customers, a hint and first messages (P10-02).
+    demo_customers_file: Path = Path("data/seed/demo_customers.json")
 
     langfuse_public_key: str = ""
     langfuse_secret_key: SecretStr = SecretStr("")
     langfuse_host: str = ""
 
-    daily_budget_usd: float = Field(default=0.5, ge=0)
+    # Production budget guard (operations §6, owner decision 2026-11-23).
+    daily_budget_usd: float = Field(default=0.20, ge=0)
+    # Deployment lock on auto-reply (ADR-0019: auto-reply stays off in the demo). While false,
+    # `PUT /admin/settings` refuses to switch auto-reply on, and `decide` never auto-replies,
+    # whatever the stored setting says (security §3, G5).
+    auto_reply_allowed: bool = False
     eval_max_cost_usd: float = Field(default=1.0, ge=0)
     # Committed evaluation runs (`metrics.json`, `config.json`); read by `/console/evals/latest`.
     eval_runs_dir: Path = Path("evals/runs")

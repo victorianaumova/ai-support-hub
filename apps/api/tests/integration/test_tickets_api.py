@@ -5,9 +5,13 @@ chained rows. Every test gets a fresh app (fresh rate limits) and empty tables.
 """
 
 import asyncio
+import dataclasses
 import json
+import threading
 import uuid
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Any
 
 import psycopg
@@ -23,7 +27,7 @@ from hub.api.limits import RateLimiter
 from hub.audit import ChainCheck, verify_chain
 from hub.config import Settings
 from hub.db.models import Message
-from hub.db.repositories import MessageRepository
+from hub.db.repositories import FeedbackRepository, MessageRepository
 from hub.db.session import connect
 from hub.deps import Container
 from hub.guardrails import masking
@@ -934,3 +938,145 @@ def test_a_database_error_detail_is_logged_as_class_and_constraint_only(
     assert error["db_constraint"] == "ck_messages_masked_entities"
     assert error["db_error_class"] == "sqlalchemy.exc.IntegrityError"
     assert [e["exc_type"] for e in error["exception"]] == ["DatabaseErrorSummary"]
+
+
+# --- one feedback per message, enforced by the database (P10-02) ------------------------------
+
+
+def test_concurrent_feedback_requests_store_one_rating(
+    app_client: TestClient, api_db: tuple[str, str], customers: dict[str, uuid.UUID]
+) -> None:
+    client = _login(app_client)
+    ticket_id = _new_ticket(client)["ticket_id"]
+    message_id = _assistant_message(api_db, ticket_id)
+    path = f"/api/v1/tickets/{ticket_id}/feedback"
+    start = threading.Barrier(2)
+
+    def rate(rating: str) -> Response:
+        start.wait()
+        return client.post(path, json={"message_id": message_id, "rating": rating})
+
+    with ThreadPoolExecutor(2) as pool:
+        answers = list(pool.map(rate, ["up", "down"]))
+
+    assert sorted(a.status_code for a in answers) == [200, 201]
+    assert answers[0].json() == answers[1].json()
+    assert _sql(api_db, "SELECT count(*) FROM feedback") == [(1,)]
+    created = _sql(api_db, "SELECT count(*) FROM audit_log WHERE action = 'feedback.created'")
+    assert created == [(1,)]
+
+
+def test_a_race_past_the_lock_hits_the_unique_constraint_and_answers_the_first_rating(
+    app_client: TestClient,
+    api_db: tuple[str, str],
+    customers: dict[str, uuid.UUID],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without the row lock's check (a second writer), the database refuses the second row."""
+    client = _login(app_client)
+    ticket_id = _new_ticket(client)["ticket_id"]
+    message_id = _assistant_message(api_db, ticket_id)
+    path = f"/api/v1/tickets/{ticket_id}/feedback"
+    first = client.post(path, json={"message_id": message_id, "rating": "up"})
+    real = FeedbackRepository.get_for_message
+    calls = {"n": 0}
+
+    async def blind_once(self: FeedbackRepository, mid: uuid.UUID) -> Any:  # noqa: ANN401
+        calls["n"] += 1
+        return None if calls["n"] == 1 else await real(self, mid)
+
+    monkeypatch.setattr(FeedbackRepository, "get_for_message", blind_once)
+    second = client.post(path, json={"message_id": message_id, "rating": "down"})
+
+    assert (first.status_code, second.status_code) == (201, 200)
+    assert second.json() == first.json()
+    assert _sql(api_db, "SELECT rating FROM feedback") == [("up",)]
+    created = _sql(api_db, "SELECT count(*) FROM audit_log WHERE action = 'feedback.created'")
+    assert created == [(1,)]
+
+
+def test_the_database_refuses_a_second_feedback_row_for_a_message(
+    app_client: TestClient, api_db: tuple[str, str], customers: dict[str, uuid.UUID]
+) -> None:
+    client = _login(app_client)
+    ticket_id = _new_ticket(client)["ticket_id"]
+    message_id = _assistant_message(api_db, ticket_id)
+    insert = "INSERT INTO feedback (id, ticket_id, message_id, rating) VALUES (%s, %s, %s, 'up')"
+    _sql(api_db, insert, uuid.UUID(str(uuid7())), ticket_id, message_id)
+    with pytest.raises(psycopg.errors.UniqueViolation):
+        _sql(api_db, insert, uuid.UUID(str(uuid7())), ticket_id, message_id)
+
+
+# --- the chat's customer picker (P10-02) ------------------------------------------------------
+
+
+def _demo_client(app_container: Container, tmp_path: Path, entries: object) -> TestClient:
+    path = tmp_path / "demo_customers.json"
+    path.write_text(json.dumps(entries))
+    settings = app_container.settings.model_copy(update={"demo_customers_file": path})
+    container = dataclasses.replace(app_container, settings=settings)
+    return TestClient(
+        create_app(container), base_url="https://testserver", raise_server_exceptions=False
+    )
+
+
+def _card(ref: str) -> dict[str, Any]:
+    return {"customer_ref": ref, "hint": f"hint of {ref}", "suggestions": ["Where is my money?"]}
+
+
+def test_demo_customers_lists_seeded_customers_behind_the_access_code(
+    app_container: Container, tmp_path: Path, customers: dict[str, uuid.UUID]
+) -> None:
+    # CUS-0003 is anonymised (erased) and CUS-0099 does not exist: both are left out.
+    entries = [_card("CUS-0002"), _card("CUS-0003"), _card("CUS-0099"), _card("CUS-0001")]
+    with _demo_client(app_container, tmp_path, entries) as client:
+        response = client.get("/api/v1/demo/customers", headers={"X-Demo-Access-Code": ACCESS_CODE})
+
+    assert response.status_code == 200, response.text
+    assert response.json() == [
+        {
+            "customer_ref": ref,
+            "display_name": f"Customer {ref}",
+            "tier": "verified",
+            "hint": f"hint of {ref}",
+            "suggestions": ["Where is my money?"],
+        }
+        for ref in ("CUS-0002", "CUS-0001")
+    ]
+
+
+def test_demo_customers_needs_the_right_code_and_limits_wrong_ones(
+    app_container: Container, tmp_path: Path, customers: dict[str, uuid.UUID]
+) -> None:
+    with _demo_client(app_container, tmp_path, [_card("CUS-0001")]) as client:
+        assert client.get("/api/v1/demo/customers").status_code == 422
+        statuses = [
+            client.get(
+                "/api/v1/demo/customers", headers={"X-Demo-Access-Code": "wrong"}
+            ).status_code
+            for _ in range(6)
+        ]
+        # The limit is shared with POST /demo/session: the right code is refused now too.
+        blocked = client.get("/api/v1/demo/customers", headers={"X-Demo-Access-Code": ACCESS_CODE})
+
+    assert statuses == [401] * 5 + [429]
+    assert blocked.status_code == 429
+    assert "Retry-After" in blocked.headers
+
+
+@pytest.mark.parametrize("entries", [{"not": "a list"}, [{"customer_ref": "CUS-0001"}]])
+def test_a_broken_demo_customers_file_is_503(
+    app_container: Container, tmp_path: Path, customers: dict[str, uuid.UUID], entries: object
+) -> None:
+    with _demo_client(app_container, tmp_path, entries) as client:
+        response = client.get("/api/v1/demo/customers", headers={"X-Demo-Access-Code": ACCESS_CODE})
+
+    assert (response.status_code, response.json()["code"]) == (503, "demo_unavailable")
+
+
+def test_the_committed_demo_customers_file_is_valid() -> None:
+    """The file the deployment serves parses (data-check checks it against the seed too)."""
+    from hub.api.demo import load_demo_customers
+
+    entries = load_demo_customers(Path(__file__).parents[4] / "data/seed/demo_customers.json")
+    assert len(entries) == 6

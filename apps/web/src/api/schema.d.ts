@@ -465,6 +465,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/demo/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Demo Customers */
+        get: operations["list_demo_customers_api_v1_demo_customers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/demo/session": {
         parameters: {
             query?: never;
@@ -863,6 +880,21 @@ export interface components {
          * @enum {string}
          */
         CustomerTier: "starter" | "verified" | "business";
+        /**
+         * DemoCustomerOut
+         * @description A card of the chat's customer picker (UI §2).
+         */
+        DemoCustomerOut: {
+            /** Customer Ref */
+            customer_ref: string;
+            /** Display Name */
+            display_name: string;
+            /** Hint */
+            hint: string;
+            /** Suggestions */
+            suggestions: string[];
+            tier: components["schemas"]["CustomerTier"];
+        };
         /** DemoSessionIn */
         DemoSessionIn: {
             /** Access Code */
@@ -2553,6 +2585,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConsoleMessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_demo_customers_api_v1_demo_customers_get: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Demo-Access-Code": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoCustomerOut"][];
                 };
             };
             /** @description Validation Error */

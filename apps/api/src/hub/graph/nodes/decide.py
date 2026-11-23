@@ -3,7 +3,9 @@
 Rows 2 to 9 of the decision table (`hub.graph.routing.decide`, P6-02), with the rule version of
 confidence and the console settings `auto_reply_enabled`, `confidence_threshold` and
 `intent_allowlist` (read per run, so a change counts at once). A missing or broken setting is
-the safe side: auto-reply off, nothing allowed, a threshold no confidence reaches.
+the safe side: auto-reply off, nothing allowed, a threshold no confidence reaches. While the
+deployment does not allow auto-reply (`AUTO_REPLY_ALLOWED`, ADR-0019) the stored
+`auto_reply_enabled` is ignored and every draft goes to an operator.
 
 `memory_shows_open_case` (P6-05): the customer has another open ticket with the triage intent,
 or a memory item of the last 14 days on it (`hub.domain.memory.shows_open_case`).
@@ -69,6 +71,13 @@ def threshold(value: object) -> float:
     return float(value)
 
 
+def auto_reply_on(pipeline: Pipeline, settings: dict[SettingKey, Any]) -> bool:
+    """The stored setting counts only while the deployment allows auto-reply
+    (`AUTO_REPLY_ALLOWED`, ADR-0019): a row switched on by hand or by an old version of the
+    settings endpoint still sends the draft to an operator (`auto_reply_off`)."""
+    return pipeline.auto_reply_allowed and settings.get(SettingKey.AUTO_REPLY_ENABLED) is True
+
+
 def open_case(state: TicketState, now: datetime) -> bool:
     triage = state.get("triage")
     return triage is not None and shows_open_case(state.get("customer_context"), triage.intent, now)
@@ -90,7 +99,7 @@ async def run(state: TicketState, ctx: GraphContext) -> TicketState:
             retry_count=state.get("retry_count", 0),
             verifies=pipeline.verifies,
             mask_failed=mask_failed(state),
-            auto_reply_enabled=settings.get(SettingKey.AUTO_REPLY_ENABLED) is True,
+            auto_reply_enabled=auto_reply_on(pipeline, settings),
             allowed_intents=auto_reply_intents(
                 pipeline.policy, settings.get(SettingKey.INTENT_ALLOWLIST)
             ),

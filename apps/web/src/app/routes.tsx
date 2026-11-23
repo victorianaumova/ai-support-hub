@@ -3,6 +3,8 @@ import { RequireOperator } from "../auth/RequireOperator";
 import { AREA_ROLES } from "../auth/session";
 import { ConsoleLayout } from "../layouts/ConsoleLayout";
 import { PublicLayout } from "../layouts/PublicLayout";
+import { ChatPage } from "../chat/ChatPage";
+import { HelpArticle } from "../help/HelpArticle";
 import { ConsoleLogin } from "../pages/ConsoleLogin";
 import { Landing } from "../pages/Landing";
 import { NotFound } from "../pages/NotFound";
@@ -16,8 +18,8 @@ export const routes: RouteObject[] = [
     errorElement: <RouteError />,
     children: [
       { path: "/", element: <Landing /> },
-      { path: "/chat", element: <Placeholder title="Customer chat" task="P10-02" /> },
-      { path: "/help/:docId", element: <Placeholder title="Help article" task="P10-02" /> },
+      { path: "/chat", element: <ChatPage /> },
+      { path: "/help/:docId", element: <HelpArticle /> },
       { path: "/console/login", element: <ConsoleLogin /> },
       { path: "*", element: <NotFound /> },
     ],

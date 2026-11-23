@@ -130,7 +130,7 @@ def _index_kb(urls: Urls, qdrant_url: str) -> None:
     asyncio.run(index())
 
 
-def _settings(urls: Urls, qdrant_url: str) -> Settings:
+def _settings(urls: Urls, qdrant_url: str, *, auto_reply_allowed: bool = False) -> Settings:
     return Settings(
         _env_file=None,
         app_env="test",
@@ -142,11 +142,14 @@ def _settings(urls: Urls, qdrant_url: str) -> Settings:
         llm_mode="fake",
         models_config=ROOT / "config" / "models.yaml",
         prompts_dir=ROOT / "prompts",
+        auto_reply_allowed=auto_reply_allowed,
     )
 
 
-def _container(urls: Urls, qdrant_url: str, *, search: bool = True) -> Container:
-    settings = _settings(urls, qdrant_url)
+def _container(
+    urls: Urls, qdrant_url: str, *, search: bool = True, auto_reply_allowed: bool = False
+) -> Container:
+    settings = _settings(urls, qdrant_url, auto_reply_allowed=auto_reply_allowed)
     database = connect(settings.database_url.get_secret_value())
     kb = _kb_services(settings, database)
     pipeline = build_pipeline(settings, database, kb.retriever if search else None)
@@ -162,10 +165,16 @@ def _truncate(urls: Urls) -> None:
 
 
 @pytest.fixture
-def app(run_db: Urls, qdrant: str) -> Iterator[FastAPI]:
+def auto_reply_allowed() -> bool:
+    """`AUTO_REPLY_ALLOWED` of the app; a test parametrizes it to switch the lock off."""
+    return False
+
+
+@pytest.fixture
+def app(run_db: Urls, qdrant: str, auto_reply_allowed: bool) -> Iterator[FastAPI]:
     _truncate(run_db)
     add_customer(run_db)
-    application = create_app(_container(run_db, qdrant))
+    application = create_app(_container(run_db, qdrant, auto_reply_allowed=auto_reply_allowed))
     with TestClient(application):  # runs the lifespan: waits for runs at the end
         yield application
 
@@ -1247,6 +1256,7 @@ def _settings_put(lead: TestClient, **changes: Any) -> None:  # noqa: ANN401
     assert response.status_code == 200, response.text
 
 
+@pytest.mark.parametrize("auto_reply_allowed", [True])
 def test_switching_auto_reply_off_sends_the_next_ticket_to_approval(
     app: FastAPI, run_db: Urls
 ) -> None:
@@ -1287,4 +1297,25 @@ def test_switching_auto_reply_off_sends_the_next_ticket_to_approval(
         ]
     finally:
         # Settings are not truncated between tests of this module; the others expect none.
+        run_sql(run_db, "DELETE FROM settings")
+
+
+def test_a_stored_auto_reply_setting_is_ignored_while_the_deployment_does_not_allow_it(
+    app: FastAPI, run_db: Urls
+) -> None:
+    """ADR-0019 (owner decision, P10-02), defence in depth: a row switched on behind the API's
+    back still sends the draft to an operator."""
+    run_sql(
+        run_db,
+        "INSERT INTO settings (key, value) VALUES ('auto_reply_enabled', 'true'),"
+        " ('confidence_threshold', '0.01'), ('intent_allowlist', '[\"withdrawal_issue\"]')",
+    )
+    try:
+        ticket_id, events = _post(customer_client(app), SEPA)
+        route = _one(
+            run_db, "SELECT route, route_reasons FROM runs WHERE ticket_id = %s", ticket_id
+        )
+        assert route == ("approval", ["auto_reply_off"])
+        assert ("ticket.status", {"status": "pending_approval"}) in events
+    finally:
         run_sql(run_db, "DELETE FROM settings")

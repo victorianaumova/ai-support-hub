@@ -92,6 +92,7 @@ def build_pipeline(
         confidence_rule=load_confidence(settings.confidence_config),
         retriever=retriever,
         checkpoints=CheckpointStore.postgres(settings.database_url.get_secret_value()),
+        auto_reply_allowed=settings.auto_reply_allowed,
     )
 
 
