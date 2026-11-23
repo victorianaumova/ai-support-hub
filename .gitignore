@@ -26,6 +26,8 @@ test-results/
 
 # Local embedding model files (`make models`, ADR-0018)
 .cache/
+# Also a symlink named .cache (a git worktree that shares the model folder).
+/.cache
 
 # Evaluation: only small reports are committed, never raw results
 results.jsonl
