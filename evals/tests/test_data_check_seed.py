@@ -10,7 +10,15 @@ from pathlib import Path
 
 import pytest
 
-from hub_evals.data_check import SEED_FILES, check, check_card_data, check_seed, main
+from hub_evals.data_check import (
+    DEMO_CUSTOMERS_FILE,
+    SEED_FILES,
+    check,
+    check_card_data,
+    check_demo_customers,
+    check_seed,
+    main,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 SEED = ROOT / "data" / "seed"
@@ -134,4 +142,32 @@ def test_check_card_data_leaves_invalid_json_to_the_schema() -> None:
 
 
 def test_the_seed_files_constant_matches_the_data_model() -> None:
-    assert set(SEED_FILES) == {p.name for p in SEED.glob("*.json")}
+    assert {*SEED_FILES, DEMO_CUSTOMERS_FILE} == {p.name for p in SEED.glob("*.json")}
+
+
+def test_the_demo_customers_file_names_seeded_customers_only(tmp_path: Path) -> None:
+    from hub.domain.seed import parse_seed
+
+    seed = parse_seed({name: (SEED / name).read_bytes() for name in SEED_FILES})
+    path = tmp_path / DEMO_CUSTOMERS_FILE
+    card = {"hint": "h", "suggestions": ["Where is my money?"]}
+    path.write_text(
+        json.dumps(
+            [
+                {"customer_ref": "CUS-0001", **card},
+                {"customer_ref": "CUS-0001", **card},
+                {"customer_ref": "CUS-0999", **card},
+                {"customer_ref": "CUS-0021", **card},
+            ]
+        )
+    )
+    assert check_demo_customers(path, seed) == [
+        "seed/demo_customers.json: CUS-0001: listed more than once",
+        "seed/demo_customers.json: CUS-0999: not in customers.json",
+        "seed/demo_customers.json: CUS-0021: holds attack-suite canaries; never a demo card",
+    ]
+    path.write_text(json.dumps([{"customer_ref": "CUS-0001", "hint": "h", "suggestions": []}]))
+    assert check_demo_customers(path, seed)
+    path.write_text(json.dumps([{"customer_ref": "CUS-0001", **card, "x": 1}]))
+    assert check_demo_customers(path, seed)
+    assert check_demo_customers(tmp_path / "missing.json", seed) == []

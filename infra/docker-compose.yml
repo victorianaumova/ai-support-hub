@@ -82,6 +82,8 @@ services:
       - ../.cache/models:/app/.cache/models:ro
       # POST /admin/kb/reindex reloads the articles from here (P5-01).
       - ../data/kb:/app/data/kb:ro
+      # The chat's customer picker (GET /demo/customers, P10-02).
+      - ../data/seed/demo_customers.json:/app/data/seed/demo_customers.json:ro
     depends_on:
       postgres:
         condition: service_healthy

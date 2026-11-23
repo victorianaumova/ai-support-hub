@@ -755,3 +755,40 @@ def daily_limit_errors(seed: SeedData, customers: dict[str, Customer]) -> list[s
                 f"daily limit of EUR {limit} of the {customers[ref].tier} tier"
             )
     return errors
+
+
+# --- the chat's customer picker (P10-02) ----------------------------------------------------
+
+# Customers whose seed data holds canary strings of the attack suite (P8-01): never on a card.
+CANARY_CUSTOMERS = frozenset({"CUS-0021", "CUS-0023"})
+
+
+class DemoCustomerEntry(BaseModel):
+    """One card of `data/seed/demo_customers.json`: which customer, a hint, first messages."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    customer_ref: Annotated[str, Field(pattern=r"^CUS-\d{4}$")]
+    hint: Annotated[str, Field(min_length=1, max_length=40)]
+    suggestions: Annotated[
+        list[Annotated[str, Field(min_length=1, max_length=140)]], Field(min_length=1, max_length=4)
+    ]
+
+
+DEMO_CUSTOMERS = TypeAdapter(list[DemoCustomerEntry])
+
+
+def validate_demo_customers(entries: list[DemoCustomerEntry], seed: SeedData) -> list[str]:
+    """Every card names a seeded customer once, and never a canary customer."""
+    known = {customer.external_ref for customer in seed.customers}
+    errors = [
+        f"{ref}: listed more than once"
+        for ref, n in Counter(e.customer_ref for e in entries).items()
+        if n > 1
+    ]
+    for entry in entries:
+        if entry.customer_ref not in known:
+            errors.append(f"{entry.customer_ref}: not in customers.json")
+        if entry.customer_ref in CANARY_CUSTOMERS:
+            errors.append(f"{entry.customer_ref}: holds attack-suite canaries; never a demo card")
+    return errors

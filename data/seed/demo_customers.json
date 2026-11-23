@@ -1,0 +1,59 @@
+[
+  {
+    "customer_ref": "CUS-0001",
+    "hint": "SEPA withdrawal still on its way",
+    "suggestions": [
+      "Hi, I withdrew 750 EUR to my bank account by SEPA yesterday afternoon and it is still not there. How long does a SEPA withdrawal take?",
+      "Why was I charged a fee for my SEPA withdrawal to Banco Almenara?",
+      "Can I cancel a withdrawal that is still pending?"
+    ]
+  },
+  {
+    "customer_ref": "CUS-0016",
+    "hint": "Failed withdrawal with an error code",
+    "suggestions": [
+      "my 900 EUR withdrawal to my bank failed yesterday and it says ERR-2010. what does that mean?",
+      "Is the money from the failed withdrawal back in my EUR balance?",
+      "How can I fix this and send the 900 EUR again?"
+    ]
+  },
+  {
+    "customer_ref": "CUS-0010",
+    "hint": "Physical card not delivered yet",
+    "suggestions": [
+      "My physical card was shipped over a month ago and still has not arrived. Where is it?",
+      "I paid 9.90 EUR for card delivery. What can I do if the card never shows up?",
+      "Can I use my virtual card while I wait for the physical one?"
+    ]
+  },
+  {
+    "customer_ref": "CUS-0007",
+    "hint": "Restricted account",
+    "suggestions": [
+      "My account is restricted and I cannot withdraw. Why, and what do I need to do?",
+      "My 4000 EUR SEPA withdrawal failed yesterday. Is that because of the restriction?",
+      "My card payment of 86.40 EUR was declined. Can I still use my card?",
+      "How long will the restriction last? I need access to my money."
+    ]
+  },
+  {
+    "customer_ref": "CUS-0005",
+    "hint": "Verification upgrade was rejected",
+    "suggestions": [
+      "My verification was rejected and the app shows ERR-4010. What does that mean?",
+      "What do I need to send to verify my account again?",
+      "How long does verification take once I have sent my documents?",
+      "A 250 EUR SEPA transfer to my account failed yesterday. Is this because I am not verified?"
+    ]
+  },
+  {
+    "customer_ref": "CUS-0032",
+    "hint": "Asks about fees and exchange rates",
+    "suggestions": [
+      "I converted 6000 GBP to EUR and was charged 90. How is the conversion fee calculated?",
+      "Which exchange rate do you use when I convert GBP to EUR?",
+      "What does it cost to take cash out of an ATM with my card?",
+      "Is there a fee for a SWIFT withdrawal in EUR?"
+    ]
+  }
+]

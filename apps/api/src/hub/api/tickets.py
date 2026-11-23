@@ -631,5 +631,15 @@ async def give_feedback(
     )
     if masked is not None:
         await audit_masking(session, masked, entity_type="feedback", entity_id=feedback.id)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # Another request stored the first rating (unique `feedback.message_id`, migration
+        # 0014): answer like a repeat.
+        await session.rollback()
+        first = await feedbacks.get_for_message(body.message_id)
+        if first is None:
+            raise
+        response.status_code = 200
+        return FeedbackOut(id=first.id)
     return FeedbackOut(id=feedback.id)

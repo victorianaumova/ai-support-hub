@@ -78,6 +78,8 @@ class Settings(BaseSettings):
     session_secret: SecretStr = SecretStr("")
     demo_access_code: SecretStr = SecretStr("")
     seed_operator_password: SecretStr = SecretStr("")
+    # The chat's customer picker: which demo customers, a hint and first messages (P10-02).
+    demo_customers_file: Path = Path("data/seed/demo_customers.json")
 
     langfuse_public_key: str = ""
     langfuse_secret_key: SecretStr = SecretStr("")

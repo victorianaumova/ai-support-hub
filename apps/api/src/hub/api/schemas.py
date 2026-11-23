@@ -49,6 +49,13 @@ class CustomerProfileOut(BaseModel):
     tier: CustomerTier
 
 
+class DemoCustomerOut(CustomerProfileOut):
+    """A card of the chat's customer picker (UI §2)."""
+
+    hint: str
+    suggestions: list[str]
+
+
 class MessageIn(_Strict):
     message: MessageText
 

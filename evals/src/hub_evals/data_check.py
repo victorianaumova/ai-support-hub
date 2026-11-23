@@ -34,7 +34,13 @@ from hub.domain.kb import (
     parse_article,
     parse_error_codes,
 )
-from hub.domain.seed import SeedData, parse_seed, validate_seed
+from hub.domain.seed import (
+    DEMO_CUSTOMERS,
+    SeedData,
+    parse_seed,
+    validate_demo_customers,
+    validate_seed,
+)
 from hub.guardrails.masking import mask, mask_text
 from hub_evals.schemas import (
     ATTACKS_PER_CATEGORY,
@@ -51,6 +57,8 @@ PLACEHOLDER = ".gitkeep"
 # Written by macOS Finder and git-ignored; not data.
 OS_NOISE = frozenset({".DS_Store"})
 SEED_FILES = ("customers.json", "cards.json", "transactions.json", "operators.json")
+# The chat's customer picker (P10-02): optional, checked against the seed when present.
+DEMO_CUSTOMERS_FILE = "demo_customers.json"
 # Stricter than masking, which only catches Luhn-valid numbers: the seed holds no long digit
 # runs at all (cards keep only the last 4 digits).
 _LONG_DIGIT_RUN = re.compile(r"\d{13,}")
@@ -104,7 +112,11 @@ def check_layout(data_dir: Path) -> list[str]:
 
 
 def _is_seed_file(relative: Path) -> bool:
-    return relative.parts[0] == "seed" and len(relative.parts) == 2 and relative.name in SEED_FILES
+    return (
+        relative.parts[0] == "seed"
+        and len(relative.parts) == 2
+        and relative.name in {*SEED_FILES, DEMO_CUSTOMERS_FILE}
+    )
 
 
 def _is_kb_file(relative: Path) -> bool:
@@ -177,7 +189,21 @@ def check_seed(seed_dir: Path) -> list[str]:
     if codes is None:
         errors.append(f"seed: error codes cannot be checked: {ERROR_CODES_FILE} missing or invalid")
         codes = _codes_used(seed)  # report the other seed rules anyway
-    return [*errors, *(f"seed: {message}" for message in validate_seed(seed, codes))]
+    errors.extend(f"seed: {message}" for message in validate_seed(seed, codes))
+    return [*errors, *check_demo_customers(seed_dir / DEMO_CUSTOMERS_FILE, seed)]
+
+
+def check_demo_customers(path: Path, seed: SeedData) -> list[str]:
+    """Schema, known customers, no canary customer, no card data in hints or suggestions."""
+    if not path.is_file():
+        return []
+    raw = path.read_bytes()
+    errors = check_card_data(path.name, raw)
+    try:
+        entries = DEMO_CUSTOMERS.validate_json(raw)
+    except ValidationError as error:
+        return [*errors, *(f"seed/{path.name}: {m}" for m in _format_validation(error))]
+    return [*errors, *(f"seed/{path.name}: {m}" for m in validate_demo_customers(entries, seed))]
 
 
 def _read_error_codes(path: Path) -> frozenset[str] | None:

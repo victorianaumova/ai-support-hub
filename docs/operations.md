@@ -64,6 +64,7 @@ All settings are environment variables read by one Pydantic `Settings` class (`h
 | `JIRA_MODE`, `SLACK_MODE` | `mock` | only `mock` ([ADR-0019](adr/0019-scope-cuts.md)); the real-mode settings were removed in P7-02, and an old `.env` line such as `JIRA_API_TOKEN=` now stops the start (unknown variable) |
 | `SESSION_SECRET` | random 32 bytes | |
 | `DEMO_ACCESS_CODE` | | for the public chat |
+| `DEMO_CUSTOMERS_FILE` | `data/seed/demo_customers.json` | the chat's customer picker (`GET /demo/customers`, P10-02); compose mounts it read-only, the API image copies it (P10-06) |
 | `SEED_OPERATOR_PASSWORD` | | used by `make seed` |
 | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` | | tracing is off when empty |
 | `DAILY_BUDGET_USD` | `0.50` | start value of the setting |

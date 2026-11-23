@@ -406,7 +406,8 @@ class Feedback(Base):
 
     id: Mapped[uuid.UUID] = _id_column()
     ticket_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tickets.id"))
-    message_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("messages.id"))
+    # One rating per message (migration 0014); the API also locks the message row.
+    message_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("messages.id"), unique=True)
     rating: Mapped[FeedbackRating] = mapped_column(TextEnum(FeedbackRating))
     comment: Mapped[str | None]
     created_at: Mapped[datetime] = _created_at_column()
