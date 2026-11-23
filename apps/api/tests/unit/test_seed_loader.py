@@ -97,6 +97,11 @@ def test_main_reports_a_seed_error_without_a_traceback(
     assert capsys.readouterr().err.startswith("seed: cannot read")
 
 
+def test_main_refuses_an_unknown_option(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--reset-passwords"]) == 2
+    assert "--reset-operator-passwords" in capsys.readouterr().err
+
+
 def test_the_loader_and_data_check_know_the_same_files() -> None:
     from hub_evals.data_check import SEED_FILES as CHECKED
 

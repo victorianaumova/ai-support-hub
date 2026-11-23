@@ -4,7 +4,10 @@ Idempotent, in one transaction:
 - customers are upserted by `external_ref` (the Hub mirrors the core mock), except anonymised
   rows: an erasure must survive a later seed;
 - operators and settings are inserted only when missing, so a re-run never resets an operator's
-  password or a value a lead changed in the console.
+  password or a value a lead changed in the console. The one exception is asked for by hand:
+  `--reset-operator-passwords` sets every demo operator whose password is not
+  `SEED_OPERATOR_PASSWORD` back to it, ends their sessions and lifts a lockout (P10-07: the
+  first deploy seeded a password that ended in a newline).
 
 Cards and transactions are not loaded: the core mock reads them from `data/seed/` (P7).
 Every row written gets an audit record; a run that changes nothing writes none.
@@ -20,7 +23,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hub.audit import record
-from hub.auth.passwords import hash_password
+from hub.auth.passwords import hash_password, verify_password
 from hub.config import Settings, SettingsError, load_settings
 from hub.db.models import Customer, Operator, Setting
 from hub.db.repositories import CustomerRepository, OperatorRepository
@@ -56,6 +59,7 @@ class SeedReport:
     customers_updated: int = 0
     customers_unchanged: int = 0
     operators_added: int = 0
+    operators_reset: int = 0
     settings_added: list[str] = field(default_factory=list)
 
     @property
@@ -64,6 +68,7 @@ class SeedReport:
             self.customers_added
             or self.customers_updated
             or self.operators_added
+            or self.operators_reset
             or self.settings_added
         )
 
@@ -111,6 +116,7 @@ async def load_seed(
     operator_password: str,
     daily_budget_usd: float,
     policy: Policy,
+    reset_operator_passwords: bool = False,
 ) -> SeedReport:
     """Write the seed inside the caller's transaction (the caller commits)."""
     if not operator_password:
@@ -121,6 +127,8 @@ async def load_seed(
     report = SeedReport()
     await _load_customers(session, seed, report)
     await _load_operators(session, seed, operator_password, report)
+    if reset_operator_passwords:
+        await _reset_operator_passwords(session, seed, operator_password, report)
     await _load_settings(session, default_settings(daily_budget_usd, policy), report)
     return report
 
@@ -179,6 +187,24 @@ async def _load_operators(
         report.operators_added += 1
 
 
+async def _reset_operator_passwords(
+    session: AsyncSession, seed: SeedData, password: str, report: SeedReport
+) -> None:
+    """Demo operators only (the seed file's emails); one whose password already matches is left
+    alone, so a second reset writes nothing."""
+    operators = OperatorRepository(session)
+    for item in seed.operators:
+        row = await operators.get_by_email(item.email, for_update=True)
+        if row is None or verify_password(row.password_hash, password):
+            continue
+        await operators.change_password(row, hash_password(password))  # ends their sessions
+        row.failed_logins = 0
+        row.locked_until = None
+        await session.flush()
+        await _audit(session, "seed.operator_password_reset", "operator", row)
+        report.operators_reset += 1
+
+
 async def _load_settings(
     session: AsyncSession, defaults: dict[SettingKey, Any], report: SeedReport
 ) -> None:
@@ -217,7 +243,9 @@ async def _audit(
     )
 
 
-async def run(settings: Settings, seed_dir: Path) -> SeedReport:
+async def run(
+    settings: Settings, seed_dir: Path, *, reset_operator_passwords: bool = False
+) -> SeedReport:
     seed = read_seed(seed_dir)
     try:
         policy = load_policy(settings.policy_config)
@@ -232,21 +260,34 @@ async def run(settings: Settings, seed_dir: Path) -> SeedReport:
                 operator_password=settings.seed_operator_password.get_secret_value(),
                 daily_budget_usd=settings.daily_budget_usd,
                 policy=policy,
+                reset_operator_passwords=reset_operator_passwords,
             )
     finally:
         await database.dispose()
 
 
+RESET_FLAG = "--reset-operator-passwords"
+
+
 def main(argv: list[str]) -> int:
-    seed_dir = Path(argv[0]) if argv else SEED_DIR
+    """`python -m hub.seed [SEED_DIR] [--reset-operator-passwords]`."""
+    unknown = [arg for arg in argv if arg.startswith("--") and arg != RESET_FLAG]
+    if unknown:
+        print(f"seed: unknown option {unknown[0]} (known: {RESET_FLAG})", file=sys.stderr)
+        return 2
+    paths = [arg for arg in argv if not arg.startswith("--")]
+    seed_dir = Path(paths[0]) if paths else SEED_DIR
     try:
-        report = asyncio.run(run(load_settings(), seed_dir))
+        report = asyncio.run(
+            run(load_settings(), seed_dir, reset_operator_passwords=RESET_FLAG in argv)
+        )
     except (SeedError, SettingsError) as error:
         print(f"seed: {error}", file=sys.stderr)
         return 1
     print(
         f"seed: customers +{report.customers_added} ~{report.customers_updated} "
-        f"={report.customers_unchanged}; operators +{report.operators_added}; "
+        f"={report.customers_unchanged}; operators +{report.operators_added} "
+        f"reset {report.operators_reset}; "
         f"settings +{len(report.settings_added)}" + ("" if report.changed else " (nothing to do)")
     )
     return 0
