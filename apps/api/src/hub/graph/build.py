@@ -27,6 +27,10 @@ shorter than all of them in a row: a stuck provider ends in a handoff, not a han
 timeout is a failure like any other (`<node>:TimeoutError`), except where ai-pipeline §3 says the
 node continues: a research timeout gives degraded empty evidence, a verify timeout an unsupported
 draft (`verify_error = TimeoutError`).
+
+**Steps (P9-01).** Every node that runs (not one skipped after a failure) is timed and traced
+(`GraphContext.step`) with its outcome: `ok`, `error`, `timeout` (continued as ai-pipeline §3
+says) or `paused` (`human_review` waiting for the operator).
 """
 
 import asyncio
@@ -137,23 +141,28 @@ def guarded(spec: NodeSpec) -> "GraphNode":
             return TicketState()
         if spec.step is not None:
             await runtime.context.status(spec.step)
-        try:
-            async with asyncio.timeout(spec.timeout_s):
-                return await spec.run(state, runtime.context)
-        except GraphBubbleUp:
-            raise  # LangGraph's own control flow (an interrupt, P6-03), never a failure
-        except Exception as exc:
-            if isinstance(exc, TimeoutError) and spec.on_timeout is not None:
-                logger.warning("node timed out", extra={"node": spec.name})
-                return spec.on_timeout(state)
-            if not spec.catches:
+        with runtime.context.step(spec.name) as step:
+            try:
+                async with asyncio.timeout(spec.timeout_s):
+                    return await spec.run(state, runtime.context)
+            except GraphBubbleUp:
+                # LangGraph's own control flow (an interrupt, P6-03), never a failure
+                step.outcome = "paused"
                 raise
-            error = type(exc).__name__
-            logger.warning(
-                "node failed",
-                extra={"node": spec.name, "run_id": state.get("run_id"), "error": error},
-            )
-            return TicketState(errors=[*errors, f"{spec.name}:{error}"])
+            except Exception as exc:
+                if isinstance(exc, TimeoutError) and spec.on_timeout is not None:
+                    step.outcome = "timeout"
+                    logger.warning("node timed out", extra={"node": spec.name})
+                    return spec.on_timeout(state)
+                step.outcome = "error"
+                if not spec.catches:
+                    raise
+                error = type(exc).__name__
+                logger.warning(
+                    "node failed",
+                    extra={"node": spec.name, "run_id": state.get("run_id"), "error": error},
+                )
+                return TicketState(errors=[*errors, f"{spec.name}:{error}"])
 
     node.__name__ = spec.name
     return node

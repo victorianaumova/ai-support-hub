@@ -30,6 +30,11 @@ the run up.
 The stream says so instead of claiming a handoff. Logs and the run row name only the error class:
 an error message can quote customer text.
 
+**Trace and steps (P9-01).** Every invoke of the graph (a new run, a resume, a recovery) goes
+through `invoke`: it opens the run's trace (`hub.observability.tracing`; the same trace for all
+three, its id is derived from the run id) and stores the invoke's per-step durations on the run
+(`runs.steps`), also when the graph fails.
+
 An operator may claim the ticket while the run is going (`processing → handed_off`, reason
 `operator_takeover`). Then the run still finishes, but its draft is stored as `superseded` and the
 ticket is left as the operator has it.
@@ -45,9 +50,10 @@ from langgraph.types import Command
 
 from hub.domain.enums import TicketStatus
 from hub.domain.review import ReviewDecision
-from hub.graph.build import compile_graph
+from hub.graph.build import Graph, compile_graph
 from hub.graph.context import ERROR_REASONS, GraphContext
 from hub.graph.pipeline import (
+    GRAPH_VERSION,
     STEP_UNDERSTANDING,
     Emit,
     Pipeline,
@@ -55,7 +61,7 @@ from hub.graph.pipeline import (
     run_failed_problem,
 )
 from hub.graph.state import run_input
-from hub.graph.store import current_status, fail, start_run
+from hub.graph.store import current_status, fail, record_steps, start_run
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +85,62 @@ def thread(ticket_id: uuid.UUID) -> RunnableConfig:
 
 async def ignore(_name: str, _data: dict[str, Any]) -> None:
     """The stream of a resumed or recovered run: no client listens."""
+
+
+def run_summary(final: Any) -> dict[str, Any]:  # noqa: ANN401
+    """What the trace shows as the outcome of an invoke: route, reasons and the like, no text."""
+    if not isinstance(final, dict):
+        return {}
+    triage = final.get("triage")
+    return {
+        "paused": INTERRUPT_KEY in final,
+        "intent": getattr(triage, "intent", None),
+        "route": final.get("route"),
+        "route_reasons": final.get("route_reasons"),
+        "confidence": final.get("confidence"),
+        "ticket_status": final.get("ticket_status"),
+        "errors": final.get("errors"),
+    }
+
+
+async def invoke(
+    pipeline: Pipeline,
+    graph: Graph,
+    payload: Any,  # noqa: ANN401 - a run input or a LangGraph Command
+    *,
+    ticket_id: uuid.UUID,
+    run_id: uuid.UUID,
+    context: GraphContext,
+    how: str,
+) -> Any:  # noqa: ANN401 - what LangGraph returns
+    """One invoke of the graph inside the run's trace; its steps are stored on the run whatever
+    happens. `how`: `start`, `resume` or `recover` (the trace shows each as a span of its own)."""
+    with pipeline.tracer.run(
+        run_id,
+        ticket_id=ticket_id,
+        context=pipeline.context.value,
+        name=f"run.{how}",
+        attributes={
+            "run_id": str(run_id),
+            "ticket_id": str(ticket_id),
+            "context": pipeline.context.value,
+            "graph_version": GRAPH_VERSION,
+            "variant": pipeline.variant,
+            "prompt_versions": ",".join(
+                f"{node}:{version}" for node, version in sorted(pipeline.prompt_versions.items())
+            ),
+        },
+    ) as root:
+        try:
+            final = await graph.ainvoke(payload, config=thread(ticket_id), context=context)
+        except Exception as exc:
+            root.update(level="ERROR", status_message=type(exc).__name__)
+            raise
+        finally:
+            await record_steps(pipeline, run_id, context.steps)
+        summary = run_summary(final)
+        root.update(output=summary, level="ERROR" if summary.get("errors") else "DEFAULT")
+        return final
 
 
 async def outcome_status(pipeline: Pipeline, ticket_id: uuid.UUID, final: Any) -> TicketStatus:  # noqa: ANN401
@@ -113,15 +175,19 @@ async def run_ticket(
         pipeline.live.claim(run_id)
         try:
             graph = await pipeline.checkpoints.graph(compile_graph)
-            final = await graph.ainvoke(
+            final = await invoke(
+                pipeline,
+                graph,
                 run_input(
                     ticket_id=str(ticket_id),
                     run_id=str(run_id),
                     message_id=str(message_id),
                     customer_ref=str(customer_id),
                 ),
-                config=thread(ticket_id),
+                ticket_id=ticket_id,
+                run_id=run_id,
                 context=GraphContext(pipeline=pipeline, emit=emit, last_step=STEP_UNDERSTANDING),
+                how="start",
             )
             status = await outcome_status(pipeline, ticket_id, final)
         finally:
@@ -183,10 +249,14 @@ async def resume_run(
         return False
     try:
         graph = await pipeline.checkpoints.graph(compile_graph)
-        final = await graph.ainvoke(
+        final = await invoke(
+            pipeline,
+            graph,
             Command(resume=decision.model_dump(mode="json")),
-            config=thread(ticket_id),
+            ticket_id=ticket_id,
+            run_id=run_id,
             context=GraphContext(pipeline=pipeline, emit=ignore),
+            how="resume",
         )
         return isinstance(final, dict) and not final.get("errors")
     except Exception as exc:

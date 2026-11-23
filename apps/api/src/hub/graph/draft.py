@@ -304,9 +304,17 @@ async def search(pipeline: Pipeline, query: str) -> list[KbChunk]:
     is not an error: the writer then has nothing to cite and answers `can_answer = false`."""
     if pipeline.retriever is None:
         raise KbUnavailableError
-    hits = await pipeline.retriever.search(
-        query, "external", top_k=SEARCH_TOP_K, mode=SEARCH_MODES[pipeline.variant]
-    )
+    mode = SEARCH_MODES[pipeline.variant]
+    with pipeline.tracer.observe(
+        "kb_search", as_type="retriever", input={"query": query, "mode": mode}
+    ) as span:
+        hits = await pipeline.retriever.search(query, "external", top_k=SEARCH_TOP_K, mode=mode)
+        # Ids and scores only: the chunk texts are in the writer's prompt.
+        span.update(
+            output=[
+                {"chunk_id": hit.chunk_id, "score": hit.score, "rank": hit.rank} for hit in hits
+            ]
+        )
     return list(rag_evidence(pipeline.variant, hits).chunks or ())
 
 

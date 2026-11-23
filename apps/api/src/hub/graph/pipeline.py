@@ -23,6 +23,7 @@ from hub.llm.budget import BudgetCheck
 from hub.llm.config import ModelsConfig
 from hub.llm.gateway import Gateway
 from hub.llm.prompts import Prompt, active_prompt, load_prompt
+from hub.observability.tracing import Tracer
 from hub.tools.mcp_client import ToolClient
 
 # `graph-v4`: the research tool loop and the customer profile in intake (P7-04).
@@ -131,6 +132,9 @@ class Pipeline:
     # no database.
     checkpoints: CheckpointStore = field(default_factory=CheckpointStore.memory)
     live: LiveRuns = field(default_factory=LiveRuns, compare=False)
+    # Run traces (P9-01). The app passes the tracer its gateway and tool client use; off by
+    # default (unit tests, a deployment without Langfuse keys).
+    tracer: Tracer = field(default_factory=Tracer, compare=False)
 
     def __post_init__(self) -> None:
         if self.variant not in VARIANTS:

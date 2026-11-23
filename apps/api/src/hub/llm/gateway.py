@@ -19,6 +19,10 @@ Evaluation runs wrap the provider in `CachingProvider`, a disk cache keyed by th
 plan §4): a hit makes no provider call and is recorded with mode `fake`, because it repeats a
 stored answer and nothing was paid.
 
+Every attempt is also a generation in the run's trace (P9-01, `hub.observability.tracing`):
+model, masked messages and answer, tokens, cost, prompt version and status; a G2 block is a
+guardrail observation without the request text. Outside a traced run this does nothing.
+
 The budget guard (G8, `hub/llm/budget.py`) runs before every `online` chat call, before the G2
 scan and before any provider call: a refused call is no attempt and writes no row. Calls to a
 local `fastembed/` embedding model skip it: it runs on our CPU (`LocalEmbeddingProvider`,
@@ -76,6 +80,7 @@ from hub.llm.schemas import (
     blocked_reason,
 )
 from hub.llm.structured import Invalid, check_answer, provider_schema, repair_messages
+from hub.observability.tracing import Level, Observation, Tracer
 
 # Switches LiteLLM reads from the environment (checked in LiteLLM 1.108.6). This is the one place
 # in the Hub that sets environment variables (hub/config.py). They are set before `import litellm`
@@ -453,6 +458,7 @@ class Gateway:
     budget: BudgetCheck | None
     sleep: Callable[[float], Awaitable[None]] = field(default=asyncio.sleep)
     clock: Callable[[], float] = field(default=time.perf_counter)
+    tracer: Tracer = field(default_factory=Tracer)
 
     async def complete(
         self,
@@ -615,6 +621,9 @@ class Gateway:
         entities = scan_outbound(requests[0])
         if entities:
             reason = blocked_reason(entities)
+            self.tracer.start(
+                "G2", as_type="guardrail", metadata={"node": call.node.value, "entities": entities}
+            ).end(level="ERROR", status_message=reason)
             await self.recorder.record_blocked(
                 self._row(
                     call, requests[0].model, LlmCallStatus.ERROR, error=blocked_error(reason)
@@ -625,6 +634,7 @@ class Gateway:
 
         for index, request in enumerate(requests, start=first_index):
             for attempt in range(RETRIES + 1):
+                observation = self._observe(request, call, index, attempt)
                 start = self.clock()
                 try:
                     async with asyncio.timeout(request.timeout_s):
@@ -636,14 +646,15 @@ class Gateway:
                 except FixtureMissingError:
                     # Fake mode without a recording: a test or setup mistake. Recorded, then
                     # raised as it is, never sent to the fallback.
-                    await self.recorder.record(
+                    await self._record(
+                        observation,
                         self._row(
                             call,
                             request.model,
                             LlmCallStatus.ERROR,
                             latency_ms=self._elapsed_ms(start),
                             error="FixtureMissing",
-                        )
+                        ),
                     )
                     raise
                 except Exception as exc:
@@ -655,7 +666,8 @@ class Gateway:
                         cost = self.pricing.cost(request.model, response.usage)
                     except ConfigError:
                         # The call happened and was paid: keep its tokens, then stop.
-                        await self.recorder.record(
+                        await self._record(
+                            observation,
                             self._row(
                                 call,
                                 request.model,
@@ -663,7 +675,7 @@ class Gateway:
                                 usage=response.usage,
                                 latency_ms=latency_ms,
                                 error="PricingError",
-                            )
+                            ),
                         )
                         raise
                     # A paid answer that fails the schema is not a provider failure: no retry and
@@ -674,7 +686,8 @@ class Gateway:
                         # The call was paid: keep its row, then stop. Only the class is kept;
                         # the message may quote the answer.
                         kind = type(exc).__name__
-                        await self.recorder.record(
+                        await self._record(
+                            observation,
                             self._row(
                                 call,
                                 request.model,
@@ -683,14 +696,15 @@ class Gateway:
                                 cost=cost,
                                 latency_ms=latency_ms,
                                 error=f"CheckFailed ({kind})",
-                            )
+                            ),
                         )
                         raise OutputCheckError(
                             f"node {call.node.value}: the answer check failed ({kind})"
                         ) from None
                     if invalid is None and isinstance(self.provider, CachingProvider):
                         self.provider.store(request, response)
-                    await self.recorder.record(
+                    await self._record(
+                        observation,
                         self._row(
                             call,
                             request.model,
@@ -700,18 +714,20 @@ class Gateway:
                             latency_ms=latency_ms,
                             error=invalid.summary if invalid is not None else None,
                             replayed=response.replayed,
-                        )
+                        ),
+                        response,
                     )
                     return _Outcome(request, response, cost, latency_ms, index, invalid)
                 will_retry = error.transient and attempt < RETRIES
-                await self.recorder.record(
+                await self._record(
+                    observation,
                     self._row(
                         call,
                         request.model,
                         LlmCallStatus.RETRY if will_retry else LlmCallStatus.ERROR,
                         latency_ms=self._elapsed_ms(start),
                         error=error.summary,
-                    )
+                    ),
                 )
                 if not will_retry:
                     break
@@ -727,6 +743,49 @@ class Gateway:
         config = self._role(role, "chat")
         await self.recorder.record(
             self._row(call, config.model, LlmCallStatus.ERROR, latency_ms=latency_ms, error=error)
+        )
+
+    def _observe(
+        self, request: ProviderRequest, call: CallContext, index: int, attempt: int
+    ) -> Observation:
+        """The attempt's generation. Chat messages are already masked (G1, then the G2 scan);
+        an embedding's texts are not sent, only their number."""
+        return self.tracer.start(
+            call.node.value,
+            as_type="generation" if request.kind == "chat" else "embedding",
+            model=request.model,
+            version=call.prompt_version,
+            input=request.messages if request.kind == "chat" else {"texts": len(request.texts)},
+            model_parameters={"max_tokens": request.max_tokens} if request.max_tokens else None,
+            metadata={
+                "prompt_version": call.prompt_version,
+                "context": call.context.value,
+                "attempt": attempt + 1,
+                "fallback": index > 0,
+                "schema": request.schema_name,
+                "tools": [tool.get("name") for tool in request.tools or []] or None,
+            },
+        )
+
+    async def _record(
+        self,
+        observation: Observation,
+        row: LlmCallRecord,
+        response: ProviderResponse | None = None,
+    ) -> None:
+        """The attempt's `llm_calls` row, then its generation closed with the same numbers."""
+        await self.recorder.record(row)
+        observation.end(
+            output=_trace_output(response),
+            usage_details={
+                "input": row.input_tokens,
+                "output": row.output_tokens,
+                "cache_read_input_tokens": row.cached_tokens,
+            },
+            cost_details={"total": float(row.cost_usd)},
+            level=_TRACE_LEVELS[row.status],
+            status_message=row.error,
+            metadata={"status": row.status.value, "latency_ms": row.latency_ms},
         )
 
     def _elapsed_ms(self, start: float) -> int:
@@ -764,6 +823,29 @@ class Gateway:
         )
 
 
+_TRACE_LEVELS: dict[LlmCallStatus, Level] = {
+    LlmCallStatus.OK: "DEFAULT",
+    LlmCallStatus.RETRY: "WARNING",
+    LlmCallStatus.INVALID_OUTPUT: "WARNING",
+    LlmCallStatus.ERROR: "ERROR",
+}
+
+
+def _trace_output(response: ProviderResponse | None) -> object:
+    """What a generation shows as its output: the answer (masked by the tracer), the tool calls
+    the model asked for, or only the number of vectors."""
+    if response is None:
+        return None
+    if response.vectors:
+        return {"vectors": len(response.vectors)}
+    if response.tool_calls:
+        return {
+            "content": response.content,
+            "tool_calls": [call.model_dump() for call in response.tool_calls],
+        }
+    return response.content
+
+
 def _structured[T: BaseModel](
     schema: type[T], last: _Outcome, outcomes: Sequence[_Outcome]
 ) -> Structured[T]:
@@ -790,12 +872,13 @@ def build_gateway(
     budget: BudgetCheck | None,
     *,
     cache_dir: Path | None = None,
+    tracer: Tracer | None = None,
 ) -> Gateway:
     """The gateway of the app: config files next to each other, provider and row mode from
     LLM_MODE. Embeddings always come from the local model (`LocalEmbeddingProvider`, in every
     mode: it is free and needs no network). `budget`: the app always passes its guard.
     `cache_dir`: evaluation runs only, the disk cache (`CachingProvider`) in
-    `<cache_dir>/<LLM_MODE>/`."""
+    `<cache_dir>/<LLM_MODE>/`. `tracer`: the process's tracer (off when None)."""
     models = load_models(settings.models_config)
     pricing = load_pricing(settings.models_config.parent / "pricing.yaml")
     pricing.check_covers(models)
@@ -812,6 +895,7 @@ def build_gateway(
         recorder=recorder,
         mode=LlmCallMode(settings.llm_mode),
         budget=budget,
+        tracer=tracer or Tracer(),
     )
 
 

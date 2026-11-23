@@ -83,9 +83,12 @@ class Settings(BaseSettings):
     # The built web app (`pnpm -C apps/web build`); the API serves it when set (P10-06).
     web_dist_dir: Path | None = None
 
+    # Run traces (P9-01, ADR-0021): off while either key is empty. LANGFUSE_HOST empty means
+    # Langfuse Cloud (EU). LANGFUSE_PROJECT_ID only builds the console's link to a trace.
     langfuse_public_key: str = ""
     langfuse_secret_key: SecretStr = SecretStr("")
     langfuse_host: str = ""
+    langfuse_project_id: str = ""
 
     # Production budget guard (operations §6, owner decision 2026-11-23).
     daily_budget_usd: float = Field(default=0.20, ge=0)
@@ -96,6 +99,7 @@ class Settings(BaseSettings):
     eval_max_cost_usd: float = Field(default=1.0, ge=0)
     # Committed evaluation runs (`metrics.json`, `config.json`); read by `/console/evals/latest`.
     eval_runs_dir: Path = Path("evals/runs")
+    # Share of evaluation runs that are traced (by a stable hash of the run id).
     eval_trace_sample: float = Field(default=0.2, ge=0, le=1)
 
     @field_validator("log_level", mode="before")

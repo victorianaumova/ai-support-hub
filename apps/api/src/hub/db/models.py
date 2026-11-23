@@ -495,6 +495,7 @@ class Run(Base):
         CheckConstraint("jsonb_typeof(features) = 'object'", name="features"),
         CheckConstraint("jsonb_typeof(prompt_versions) = 'object'", name="prompt_versions"),
         CheckConstraint("jsonb_typeof(models) = 'object'", name="models"),
+        CheckConstraint("jsonb_typeof(steps) = 'array'", name="steps"),
         CheckConstraint(
             "total_cost_usd >= 0 AND input_tokens >= 0 AND output_tokens >= 0", name="usage"
         ),
@@ -533,7 +534,11 @@ class Run(Base):
     latency_ms: Mapped[int | None]
     # An error class only, never a message text (it can echo customer input).
     error: Mapped[str | None]
+    # The Langfuse trace (P9-01); null when tracing is off or an evaluation run was not sampled.
     trace_id: Mapped[str | None]
+    # The nodes that ran, in order, with duration and outcome (P9-01, migration 0016):
+    # [{"node", "started_at", "duration_ms", "outcome"}]; a resume appends its own.
+    steps: Mapped[list[Any]] = mapped_column(default=list, server_default=text("'[]'::jsonb"))
     started_at: Mapped[datetime] = mapped_column(server_default=func.now())
     finished_at: Mapped[datetime | None]
 

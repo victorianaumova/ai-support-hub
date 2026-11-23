@@ -15,6 +15,10 @@ P7-04:
   scope ticket's own customer in the database (`invalid_identity` otherwise).
 - A local tool (`search_kb`) is decided and recorded like the others; the session's caller
   passes its handler, which returns the value for the caller and a short summary to store.
+
+Every call, denied ones too, is also a tool observation in the run's trace (P9-01): the stored
+(masked) arguments and the structured result, which the tracer filters (G9: card data masked,
+any restriction-reason key dropped). Outside a traced run this does nothing.
 """
 
 import asyncio
@@ -38,6 +42,7 @@ from hub.db.models import Customer, Operator, Run, Ticket, ToolCall
 from hub.db.session import Database
 from hub.domain.enums import ActorType, ToolCallStatus, ToolNode
 from hub.guardrails.masking import mask_text
+from hub.observability.tracing import Tracer
 from hub.tools.permissions import (
     MAX_NAME_LENGTH,
     Allowed,
@@ -282,10 +287,12 @@ class ToolClient:
         transport: ToolTransport,
         recorder: ToolCallRecorder,
         timeout_s: float = DEFAULT_TIMEOUT_S,
+        tracer: Tracer | None = None,
     ) -> None:
         self._transport = transport
         self._recorder = recorder
         self._timeout_s = timeout_s
+        self._tracer = tracer or Tracer()
 
     async def calls_in_run(self, scope: ToolScope) -> int:
         return await self._recorder.calls_in_run(scope.run_id, scope.node)
@@ -321,6 +328,12 @@ class ToolClient:
                         "node": scope.node.value,
                     },
                 )
+            self._tracer.start(
+                decision.tool,
+                as_type="tool",
+                input=argument_names(request.arguments),
+                metadata={"node": scope.node.value, "caller": request.caller.value},
+            ).end(level="WARNING", status_message=f"denied: {decision.reason.value}")
             await self._recorder.record(
                 ToolCallRow(
                     scope=scope,
@@ -387,6 +400,16 @@ class ToolClient:
         timeout_s: float,
     ) -> ToolOutcome:
         name = allowed.spec.name
+        observation = self._tracer.start(
+            name,
+            as_type="tool",
+            input=stored_arguments(allowed.arguments),
+            metadata={
+                "node": scope.node.value,
+                "caller": caller.value,
+                "side_effect": allowed.spec.side_effect,
+            },
+        )
         started = time.monotonic()
         summary: str | None = None
         try:
@@ -415,6 +438,12 @@ class ToolClient:
                 idempotency_key=allowed.idempotency_key if ok else None,
                 external_ref=external_ref(result) if allowed.spec.side_effect else None,
             )
+        )
+        observation.end(
+            output=result if ok else None,
+            level="DEFAULT" if ok else "ERROR",
+            status_message=error,
+            metadata={"status": status.value, "latency_ms": latency_ms},
         )
         return ToolOutcome(name, status, result=result, error=error)
 

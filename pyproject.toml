@@ -105,6 +105,15 @@ type = "protected"
 protected_modules = ["litellm"]
 allowed_importers = ["hub.llm.gateway"]
 
+# Traces leave the process only through hub.observability.tracing, which applies the G9 filter
+# (security §3) to everything it sends.
+[[tool.importlinter.contracts]]
+id = "only-tracing-imports-langfuse"
+name = "only hub.observability.tracing imports langfuse"
+type = "protected"
+protected_modules = ["langfuse"]
+allowed_importers = ["hub.observability.tracing"]
+
 # A new tests folder must be added to mypy `files` and pytest `testpaths`.
 [tool.mypy]
 strict = true

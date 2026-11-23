@@ -70,7 +70,7 @@ Three columns on desktop, stacked on mobile.
 - *Sources:* evidence chunks (title, section, score, text; the cited ones first and highlighted; a click on a citation chip scrolls here), account facts with the tool that returned them.
 - *Customer:* profile, tier, limits used, restriction flag, cards, recent transactions. Limits, flag, cards and the newest 10 transactions are read when the tab opens, through the core read tools with the tool permissions (`GET /console/tickets/{id}/account`, node `console`; owner decision, PR #66). Data that could not be read is shown as "Unknown", never as "no" or "not flagged".
 - *History:* memory summaries of earlier tickets, links to them.
-- *Run:* steps with duration, tool calls, model, prompt versions, cost, link to the trace. Steps with duration are deferred to P9-01 (owner decision, PR #66: P9-01 is restored; ADR-0020 amends ADR-0019 with it); until then the tab lists the recorded model calls and tool calls of the run with their latencies. The trace link was removed with tracing (ADR-0019).
+- *Run:* steps with duration, tool calls, model, prompt versions, cost, link to the trace. Steps with duration come from `runs.steps` (P9-01, [ADR-0021](adr/0021-restore-run-tracing.md); owner decision on PR #66): every node in order with its duration, and its outcome when not `ok` (`error`, `timeout`, `paused`; a resumed run shows `human_review` twice). Below them the recorded model calls and tool calls with their latencies. The trace row links to Langfuse when the run was traced and `LANGFUSE_PROJECT_ID` is set, shows the bare trace id without a project id, and says "Not traced" otherwise.
 
 Keyboard shortcuts: `A` approve, `E` focus the editor, `R` reject, `J`/`K` next/previous ticket.
 

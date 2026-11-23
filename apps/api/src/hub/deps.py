@@ -28,6 +28,7 @@ from hub.observability.readiness import (
     postgres_check,
     qdrant_check,
 )
+from hub.observability.tracing import Tracer
 from hub.tools.mcp_client import DbToolCallRecorder, McpTransport, ToolClient
 
 
@@ -59,11 +60,15 @@ class Container:
         return OperatorSessionSigner(secret) if secret else None
 
 
-def tool_client(settings: Settings, database: Database) -> ToolClient | None:
+def tool_client(
+    settings: Settings, database: Database, tracer: Tracer | None = None
+) -> ToolClient | None:
     token = settings.mcp_server_token.get_secret_value()
     if not token:
         return None
-    return ToolClient(McpTransport(settings.mcp_server_url, token), DbToolCallRecorder(database))
+    return ToolClient(
+        McpTransport(settings.mcp_server_url, token), DbToolCallRecorder(database), tracer=tracer
+    )
 
 
 def build_pipeline(
@@ -74,9 +79,11 @@ def build_pipeline(
     and the run (its start).
     `retriever`: the knowledge-base search; without it every run is handed to a human.
     The tool client (P7-04) needs `MCP_SERVER_TOKEN`: without it intake loads no profile and
-    research runs no tool loop."""
+    research runs no tool loop. Run traces (P9-01) are on when the Langfuse keys are set: one
+    tracer serves the gateway, the tool client and the run."""
     budget = BudgetGuard(database, default_limit=Decimal(str(settings.daily_budget_usd)))
-    gateway = build_gateway(settings, DbCallRecorder(database), budget)
+    tracer = Tracer.from_settings(settings)
+    gateway = build_gateway(settings, DbCallRecorder(database), budget, tracer=tracer)
     return Pipeline(
         database=database,
         gateway=gateway,
@@ -87,12 +94,13 @@ def build_pipeline(
         handoff_prompt=active_prompt(settings.prompts_dir, gateway.models, "handoff_summary"),
         memory_prompt=active_prompt(settings.prompts_dir, gateway.models, "memory_summary"),
         research_prompt=active_prompt(settings.prompts_dir, gateway.models, "research"),
-        tools=tool_client(settings, database),
+        tools=tool_client(settings, database, tracer),
         policy=load_policy(settings.policy_config),
         confidence_rule=load_confidence(settings.confidence_config),
         retriever=retriever,
         checkpoints=CheckpointStore.postgres(settings.database_url.get_secret_value()),
         auto_reply_allowed=settings.auto_reply_allowed,
+        tracer=tracer,
     )
 
 

@@ -162,6 +162,7 @@ Each decision has an ADR with alternatives.
 | 15 | Free-tier deployment: Cloud Run + Neon + Qdrant Cloud | [0015](adr/0015-free-tier-deployment.md) |
 | 16 | React console served by the API; cookie sessions | [0016](adr/0016-web-ui-and-auth.md) |
 | 18 | Budget mode: Anthropic only, Haiku for every role, local embeddings, a small evaluation (replaces parts of 0003, 0005, 0009, 0013) | [0018](adr/0018-budget-mode.md) |
+| 21 | Run tracing with Langfuse is back, P9-01 only (amends 0019) | [0021](adr/0021-restore-run-tracing.md) |
 
 ## 8. Repository layout
 
@@ -205,6 +206,7 @@ Module rules (enforced by import-linter in CI):
 - `domain` imports nothing from the project.
 - `guardrails`, `kb`, `llm`, `tools`, `memory`, `audit`, `privacy`, `metrics` do not import `api` or `graph`.
 - Only `llm/gateway.py` imports `litellm`; everything else reaches models through the gateway.
+- Only `observability/tracing.py` imports `langfuse`; traces leave the process only through it, after the G9 filter (P9-01).
 - `graph` is the only module that combines the others. `api` calls `graph` and repositories.
 - `apps/mcp_server` and `apps/api` do not import each other. They talk only over MCP.
 - `evals` imports `hub.graph` and runs the same code as production.

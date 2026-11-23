@@ -67,11 +67,12 @@ All settings are environment variables read by one Pydantic `Settings` class (`h
 | `DEMO_ACCESS_CODE` | | for the public chat |
 | `DEMO_CUSTOMERS_FILE` | `data/seed/demo_customers.json` | the chat's customer picker (`GET /demo/customers`, P10-02); compose mounts it read-only, the API image copies it (P10-06) |
 | `SEED_OPERATOR_PASSWORD` | | used by `make seed` |
-| `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` | | tracing is off when empty |
+| `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` | | tracing is off while either key is empty (no client, no network); an empty host means Langfuse Cloud EU |
+| `LANGFUSE_PROJECT_ID` | | only for the console's trace link; empty: the Run tab shows the bare trace id |
 | `DAILY_BUDGET_USD` | `0.20` | start value of the setting (the production guard, §6) |
 | `AUTO_REPLY_ALLOWED` | `false` | deployment lock on auto-reply ([ADR-0019](adr/0019-scope-cuts.md), [security](security.md) §3 G5): while false a lead cannot switch auto-reply on and the graph sends every draft to an operator |
 | `EVAL_MAX_COST_USD` | `1.00` | hard stop for one evaluation run |
-| `EVAL_TRACE_SAMPLE` | `0.2` | share of evaluation runs sent to Langfuse |
+| `EVAL_TRACE_SAMPLE` | `0.2` | share of evaluation runs sent to Langfuse, chosen by a stable hash of the run id |
 | `EVAL_RUNS_DIR` | `evals/runs` | committed evaluation runs; `GET /console/evals/latest` reads the newest clean real-model run here (the API image must contain the folder, P10-06) |
 | `LOG_LEVEL` | `INFO` | |
 
@@ -89,10 +90,10 @@ Runtime settings that the lead changes in the console (auto-reply, threshold, bu
 | Layer | Tool | Answers the question |
 |---|---|---|
 | Structured logs | `structlog`, JSON to stdout, masked | What happened in the service? Each line has `ticket_id`, `run_id`, `node`, `request_id`. |
-| Traces | Langfuse via OpenTelemetry | What did this run do, step by step? One trace per run; one span per node; one generation per model call (masked input and output, tokens, cost, prompt version); spans for retrieval (query, chunk ids, scores) and tool calls. Trace id stored in `runs.trace_id`; the console links to it. |
+| Traces | Langfuse via OpenTelemetry (`hub/observability/tracing.py`, P9-01, ADR-0021) | What did this run do, step by step? One trace per run, its id derived from the run id, so the resume after the operator's decision and a recovery join it (`run.start`, `run.resume`, `run.recover` spans); one span per graph node with its outcome; one generation per model call attempt, retries and fallback included (masked messages and answer, tokens, cost, latency, model, prompt version; an embedding shows only the number of texts); a guardrail observation for a G2 block (no text); one tool observation per tool call, denied ones too (masked arguments, structured result); a retriever observation per KB search (masked query, chunk ids, scores, ranks). Trace id stored in `runs.trace_id`; the console links to it. Per-step durations are also stored in `runs.steps`, so the Run tab does not need Langfuse. Calls outside a run (KB indexing, memory summary on close, the console's Customer tab, evaluation judges) are not traced. |
 | Business and cost data | Postgres: `runs`, `llm_calls`, `drafts`, `feedback` | How is the service doing? Source for the dashboard and for cost. Does not depend on the tracing vendor. |
 
-Trace attributes on every run: `ticket_id`, `intent`, `route`, `route_reasons`, `confidence`, `graph_version`, `prompt_versions`, `variant`, `context` (`online` / `eval`). Eval runs are traced with the tag `eval` and the run id, so a bad eval ticket can be opened as a trace.
+Trace attributes on every run: `run_id`, `ticket_id` (also the Langfuse session, so the runs of one ticket are grouped), `context` (also the tag: `online` / `eval`), `graph_version`, `variant`, `prompt_versions`. The root span's output holds the outcome: `intent`, `route`, `route_reasons`, `confidence`, `ticket_status`, `errors` (error classes), `paused`. An eval run's trace id is in the eval database's `runs.trace_id`, so a bad eval ticket can be opened as a trace. Tracing never breaks a run: an SDK failure is logged with its class only.
 
 **Dashboard numbers** (from Postgres, see [API](api.md) §5): tickets by route, automation share, route reasons, draft outcomes and edit ratio, latency p50/p95, cost per ticket and by node, feedback, budget used, last eval summary with pass/fail against the red lines.
 

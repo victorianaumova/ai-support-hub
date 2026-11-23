@@ -38,7 +38,7 @@ How the sessions, agent roles and reviews are organised: [build process](build-p
 | H2. Anthropic API key; a $5 spending limit in the Anthropic console (ADR-0018) | P3 |
 | H3. Review the knowledge-base articles | P2-08 |
 | H6. Review the attack set | P8-01 |
-| H8. Accounts: Google Cloud (billing + budget alert), Neon, Qdrant Cloud (no Langfuse, Jira or Slack, ADR-0019) | P10-07 |
+| H8. Accounts: Google Cloud (billing + budget alert), Neon, Qdrant Cloud; optional Langfuse Cloud (ADR-0021; the demo runs without it); no Jira or Slack (ADR-0019) | P10-07 |
 | H9. Record the demo video; publish (make the repository public and turn on branch protection for `main`, see the README) | P12 |
 
 **Rules that never bend:** see `AGENTS.md` ("Never do").
@@ -58,10 +58,11 @@ Size: S = under half a day of agent work with review, M = about a day, L = sever
 | 6 | Agents and LangGraph | Graph, routing, pause for the operator, memory |
 | 7 | Tools and MCP | MCP server, account tools, Jira and Slack actions |
 | 8 | Security | Attack suite, hardening, privacy functions |
+| 9 | LLMOps (P9-01 only) | Run traces in Langfuse, per-step durations in the console |
 | 10 | Deployment | Web app, containers, public demo, CI/CD |
 | 12 | Interview preparation | README with numbers, case study, demo script |
 
-Phase 9 (LLMOps) was removed by ADR-0019; phase 11 by ADR-0018.
+Phase 9 (LLMOps) was removed by ADR-0019 except P9-01 (tracing), which ADR-0021 restored; phase 11 was removed by ADR-0018.
 
 Dependency notes: phases run in order. Exception: web tasks P10-01 to P10-03 need only the APIs of phases 2, 6 and 7 and may be built in parallel with phase 8. P10-04 needs P10-09 (metrics and settings API) first.
 
@@ -213,9 +214,15 @@ References: [security](security.md) (all); eval plan §3 (attacks).
 
 ---
 
-## Phase 9 — removed
+## Phase 9 — LLMOps (P9-01 only)
 
-Removed by [ADR-0019](adr/0019-scope-cuts.md). Moved: P9-02 (metrics and settings API) → **P10-09**, because the dashboard and settings pages (P10-04) and the demo's kill switch need it; P9-06 (milestone run) → **P12-00**, because the README numbers (P12-01) need it. Not built: P9-01 (tracing with Langfuse), P9-03 (confidence threshold, experiment E9, human gate H7: auto-reply stays off in the demo), P9-04 (cost check), P9-05 (alerts, runbook, `make export-review-candidates`).
+Removed by [ADR-0019](adr/0019-scope-cuts.md); P9-01 restored by [ADR-0021](adr/0021-restore-run-tracing.md) (owner decision after PR #67, built before P10-07). Moved: P9-02 (metrics and settings API) → **P10-09**, because the dashboard and settings pages (P10-04) and the demo's kill switch need it; P9-06 (milestone run) → **P12-00**, because the README numbers (P12-01) need it. Not built: P9-03 (confidence threshold, experiment E9, human gate H7: auto-reply stays off in the demo), P9-04 (cost check), P9-05 (alerts, runbook, `make export-review-candidates`).
+
+References: [operations](operations.md) §3; [security](security.md) §3 (G9), §6; ADR-0014, ADR-0021.
+
+| ID | Task | Size | Done when | Verify |
+|---|---|---|---|---|
+| P9-01 | **Run tracing with Langfuse.** One trace per run (`runs.trace_id`, the id derived from the run id so a resume or recovery joins it): a span per graph node with duration and outcome, a generation per model call attempt (tokens, cost, latency, model, prompt version), a tool observation per tool call, a retriever observation per KB search. Per-step durations stored on the run (`runs.steps`) and shown in the console's Run tab with the trace link (the deferred item of P10-03, owner decision on PR #66). Everything sent passes the G9 filter (no full PAN, CVV, PIN or 2FA code, no restriction reason). Off without keys; tests need no network. Evaluation runs sampled (`EVAL_TRACE_SAMPLE`). | M | A run's trace holds its nodes, model and tool calls; `runs.trace_id` links it; the Run tab shows each step's duration; a test card number and a restriction reason in a tool result never reach an exported span; no client and no network without keys. | `make lint test test-int` |
 
 ---
 

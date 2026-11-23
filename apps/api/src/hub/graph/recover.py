@@ -48,6 +48,7 @@ from hub.graph.pipeline import Pipeline
 from hub.graph.run import (
     RunIncompleteError,
     ignore,
+    invoke,
     outcome_status,
     paused_at,
     resume_run,
@@ -344,10 +345,14 @@ async def recover_run(pipeline: Pipeline, stuck: StuckRun, recovery: Recovery) -
                 details={"ticket_id": stuck.ticket_id, "from": how},
             )
         logger.info("run recovered", extra={"run_id": str(stuck.run_id), "from": how})
-        final = await graph.ainvoke(
+        final = await invoke(
+            pipeline,
+            graph,
             start,
-            config=thread(stuck.ticket_id),
+            ticket_id=stuck.ticket_id,
+            run_id=stuck.run_id,
             context=GraphContext(pipeline=pipeline, emit=ignore),
+            how="recover",
         )
         await outcome_status(pipeline, stuck.ticket_id, final)
         return not final.get("errors")

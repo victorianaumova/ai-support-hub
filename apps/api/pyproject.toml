@@ -27,6 +27,9 @@ dependencies = [
     "jsonpatch==1.47",
     "jsonpointer==3.12",
     "langchain-core==1.7.6",
+    # Run traces (ADR-0014, ADR-0021), used only in hub.observability.tracing. 5.2.0: 2026-11-05;
+    # it pulls in the OpenTelemetry SDK and OTLP/HTTP exporter 1.45.2 (2026-10-29).
+    "langfuse==5.2.0",
     "langgraph==1.2.20",
     "langgraph-checkpoint==4.3.1",
     "langgraph-checkpoint-postgres==3.2.0",

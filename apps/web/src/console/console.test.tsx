@@ -303,7 +303,37 @@ describe("ticket workspace", () => {
     renderApp("/console/tickets/t1");
     await userEvent.click(await screen.findByRole("tab", { name: "Run" }));
     expect(screen.getByText(/triage\/v1 · ok · 812 ms/)).toBeInTheDocument();
-    expect(screen.getByText(/Durations per step come with P9-01/)).toBeInTheDocument();
+  });
+
+  it("the Run tab shows each step with its duration and links the trace", async () => {
+    const run = {
+      id: "r1", status: "interrupted", route: "approval", route_reasons: [], confidence: null, prompt_versions: {}, models: {},
+      total_cost_usd: "0", input_tokens: 0, output_tokens: 0, latency_ms: null, error: null, trace_id: "ab12", started_at: ROW.created_at, finished_at: null,
+      steps: [
+        { node: "triage", started_at: ROW.created_at, duration_ms: 1840, outcome: "ok" },
+        { node: "verify", started_at: ROW.created_at, duration_ms: 110000, outcome: "timeout" },
+        { node: "human_review", started_at: ROW.created_at, duration_ms: 35, outcome: "paused" },
+      ],
+    };
+    serve({ "GET /api/v1/console/tickets/t1": () => new Response(JSON.stringify({ ...TICKET, latest_run: run, trace_url: "https://cloud.langfuse.com/project/p/traces/ab12" })) });
+    renderApp("/console/tickets/t1");
+    await userEvent.click(await screen.findByRole("tab", { name: "Run" }));
+    expect(screen.getByText("triage · 1840 ms")).toBeInTheDocument();
+    expect(screen.getByText("verify · 110000 ms · timeout")).toBeInTheDocument();
+    expect(screen.getByText("human_review · 35 ms · paused")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open in Langfuse" })).toHaveAttribute("href", "https://cloud.langfuse.com/project/p/traces/ab12");
+  });
+
+  it("the Run tab says when a run was not traced", async () => {
+    const run = {
+      id: "r1", status: "completed", route: "handoff", route_reasons: [], confidence: null, prompt_versions: {}, models: {},
+      total_cost_usd: "0", input_tokens: 0, output_tokens: 0, latency_ms: 10, error: null, trace_id: null, steps: [], started_at: ROW.created_at, finished_at: ROW.created_at,
+    };
+    serve({ "GET /api/v1/console/tickets/t1": () => new Response(JSON.stringify({ ...TICKET, latest_run: run })) });
+    renderApp("/console/tickets/t1");
+    await userEvent.click(await screen.findByRole("tab", { name: "Run" }));
+    expect(screen.getByText("Not traced")).toBeInTheDocument();
+    expect(screen.getByText("No steps recorded.")).toBeInTheDocument();
   });
 });
 

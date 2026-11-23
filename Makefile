@@ -50,6 +50,7 @@ lint:
 SAFETY_COVERAGE := --cov=hub.guardrails --cov=hub.domain --cov=hub.audit.chain --cov=hub.auth \
 	--cov=hub.llm.gateway --cov=hub.llm.structured --cov=hub.llm.pricing --cov=hub.llm.budget \
 	--cov=hub.graph.routing --cov=hub.graph.confidence --cov=hub.tools.permissions \
+	--cov=hub.observability.tracing \
 	--cov-report=term-missing:skip-covered --cov-fail-under=95
 
 # Python unit tests, then the web app's Vitest tests (P10-01). The CI `test` job has no Node; its

@@ -170,6 +170,16 @@ class ConsoleMessageOut(BaseModel):
     created_at: datetime
 
 
+class RunStepOut(BaseModel):
+    """One node of the run with its duration (data model, `runs.steps`; P9-01). A resumed run
+    lists `human_review` twice: `paused`, then `ok` after the operator's decision."""
+
+    node: str
+    started_at: datetime
+    duration_ms: int
+    outcome: Literal["ok", "error", "timeout", "paused"]
+
+
 class RunOut(BaseModel):
     """The latest run of a ticket: status, route and what it cost (data model, `runs`)."""
 
@@ -188,6 +198,10 @@ class RunOut(BaseModel):
     latency_ms: int | None
     # An error class only, never a message text.
     error: str | None
+    # The Langfuse trace; null when tracing was off or the run was not sampled (P9-01).
+    trace_id: str | None
+    # Empty for a run from before P9-01.
+    steps: list[RunStepOut]
     started_at: datetime
     finished_at: datetime | None
 
@@ -262,7 +276,7 @@ class ToolCallOut(BaseModel):
 
 class ModelCallOut(BaseModel):
     """One model call attempt of the latest run (data model, `llm_calls`): no text, only what the
-    Run tab shows (P10-03 review). Per-step durations come with P9-01."""
+    Run tab shows (P10-03 review). Per-step durations are in `RunOut.steps` (P9-01)."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -280,8 +294,9 @@ class ModelCallOut(BaseModel):
 
 class ConsoleTicketOut(QueueTicketOut):
     """`GET /console/tickets/{id}`. Fields of later phases are present and empty until then:
-    evidence chunks (phase 5; the B0 cited documents are in `draft.evidence`), trace URL
-    (phase 9, removed by ADR-0019). `memory` (P6-05): the customer's memory items that have not
+    evidence chunks (phase 5; the B0 cited documents are in `draft.evidence`). `trace_url`
+    (P9-01): the latest run's trace in Langfuse, null without a trace id or without
+    `LANGFUSE_PROJECT_ID`. `memory` (P6-05): the customer's memory items that have not
     expired, newest first, at most 5, without this ticket's own."""
 
     language: str | None
@@ -300,7 +315,7 @@ class ConsoleTicketOut(QueueTicketOut):
     tool_calls: list[ToolCallOut] = Field(default_factory=list)
     # The model call attempts of the latest run, oldest first (P10-03 review).
     model_calls: list[ModelCallOut] = Field(default_factory=list)
-    trace_url: None = None
+    trace_url: str | None = None
 
 
 # --- account view (P10-03 review) -------------------------------------------------------------

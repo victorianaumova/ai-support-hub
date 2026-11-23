@@ -133,6 +133,7 @@ from hub.llm.schemas import (
     ProviderRequest,
     Usage,
 )
+from hub.observability.tracing import Tracer
 from hub.seed import load_customers, read_seed
 from hub.tools.facts import MAX_ACCOUNT_FACTS, render_facts
 from hub_evals import judges as judging
@@ -942,8 +943,13 @@ def build_pipeline(
     """The evaluation pipeline, its cost limit and its cache (None with `--no-cache`).
     `provider`: tests pass a scripted provider in place of the chat provider of `LLM_MODE`;
     embeddings still come from the local model. The pipeline has no retriever yet: a RAG
-    variant gets it from `eval_index` once the index is in line with the evaluation KB."""
-    gateway = build_gateway(settings, DbCallRecorder(database), None, cache_dir=cache_dir)
+    variant gets it from `eval_index` once the index is in line with the evaluation KB.
+    Runs are traced when the Langfuse keys are set, a share of them (`EVAL_TRACE_SAMPLE`, P9-01);
+    judge calls are not part of a run and are not traced."""
+    tracer = Tracer.from_settings(settings)
+    gateway = build_gateway(
+        settings, DbCallRecorder(database), None, cache_dir=cache_dir, tracer=tracer
+    )
     if provider is not None:
         provider = LocalEmbeddingProvider(provider, settings.embedding_cache_dir)
         if cache_dir is not None:
@@ -953,7 +959,7 @@ def build_pipeline(
     limit = CostLimit(
         limit=Decimal(str(settings.eval_max_cost_usd)), enforced=settings.llm_mode == "real"
     )
-    client = tool_client(settings, database) if tools and variant != B0_VARIANT else None
+    client = tool_client(settings, database, tracer) if tools and variant != B0_VARIANT else None
     if tools and variant != B0_VARIANT and client is None:
         # A run without the account tools must say so (`--no-tools`): an empty token would
         # otherwise give a run without account facts that looks like a run with them.
@@ -990,6 +996,7 @@ def build_pipeline(
         checkpoints=CheckpointStore.postgres(
             database.engine.url.render_as_string(hide_password=False)
         ),
+        tracer=tracer,
     )
     return pipeline, limit, cache
 
@@ -1118,6 +1125,7 @@ async def _run(
         return await _run_with(settings, options, tickets, database, pipeline, limit, cache)
     finally:
         await pipeline.checkpoints.close()
+        pipeline.tracer.flush()
 
 
 async def _run_with(

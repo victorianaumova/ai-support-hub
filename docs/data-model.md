@@ -135,7 +135,8 @@ One execution of the workflow for one customer message.
 | input_tokens, output_tokens | int | |
 | latency_ms | int null | until the customer got a message |
 | error | text null | an error class; `CustomerErased` for a run that waited for an operator when its customer was erased (P8-05) |
-| trace_id | text null | Langfuse trace |
+| trace_id | text null | Langfuse trace id (P9-01): derived from the run id, so a resume adds to the same trace; null when tracing is off or an evaluation run was not sampled (`EVAL_TRACE_SAMPLE`) |
+| steps | jsonb | P9-01 (migration 0016): `[{"node", "started_at", "duration_ms", "outcome"}]`, the graph nodes that ran, in order; `outcome` is `ok`, `error`, `timeout` (the node continued as ai-pipeline §3 says) or `paused` (`human_review` waiting for the operator); a resume or recovery appends its own steps. A node skipped after a failure is not listed |
 | started_at, finished_at | timestamptz | |
 
 ### drafts
@@ -181,7 +182,7 @@ Own record of every model call. Source of truth for cost.
 | status | text | `ok` \| `retry` \| `error` \| `invalid_output`. One row per attempt: a retried attempt is `retry`; a call blocked by G2 is `error` with `error = 'blocked: G2'` (card data) or `'blocked: G2 IBAN'` (a raw IBAN, ADR-0017); an answer that does not match the schema is `invalid_output` with `error = 'ValidationError (n)'` (n = number of errors; tokens and cost are kept); a paid answer whose check crashed is `error` with `error = 'CheckFailed (<exception class>)'` |
 | error | text null | error class and status code only, never provider text (it can echo the request) |
 
-Request and response bodies are **not** stored here. They are in the trace (masked, 30 days).
+Request and response bodies are **not** stored here. When tracing is on, they are in the run's trace (masked, G9; 30 days on the Langfuse free plan); otherwise nowhere.
 
 ### tool_calls
 

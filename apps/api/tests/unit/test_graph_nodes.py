@@ -10,6 +10,7 @@ import dataclasses
 import re
 import uuid
 from collections.abc import AsyncIterator
+from datetime import datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any, cast, get_type_hints
@@ -25,6 +26,7 @@ from hub.domain.triage import TriageResult
 from hub.domain.verification import ClaimCheck, ClaimsAnswer, Verification
 from hub.graph import build
 from hub.graph import draft as draft_module
+from hub.graph import run as run_module
 from hub.graph.checkpoint import CheckpointStore, serializer
 from hub.graph.context import GraphContext, error_class, failure_reasons
 from hub.graph.nodes import act, decide, handoff_prep, policy_gate, research, verify, write
@@ -420,6 +422,68 @@ async def test_langgraphs_own_control_flow_is_never_taken_for_a_failure() -> Non
     node = build.guarded(_spec(run))
     with pytest.raises(GraphInterrupt):
         await node(_state(), runtime=_runtime(_ctx()))
+
+
+async def test_every_node_that_runs_is_timed_with_its_outcome() -> None:
+    """P9-01: the steps the console's Run tab shows (`runs.steps`)."""
+
+    async def fine(state: TicketState, ctx: GraphContext) -> TicketState:
+        return TicketState()
+
+    async def broken(state: TicketState, ctx: GraphContext) -> TicketState:
+        raise RuntimeError("down")
+
+    async def slow(state: TicketState, ctx: GraphContext) -> TicketState:
+        await asyncio.sleep(5)
+        raise AssertionError("the timeout should have stopped this node")
+
+    async def pause(state: TicketState, ctx: GraphContext) -> TicketState:
+        raise GraphInterrupt(())
+
+    ctx = _ctx()
+    runtime = _runtime(ctx)
+    await build.guarded(_spec(fine, name="intake"))(_state(), runtime=runtime)
+    await build.guarded(_spec(broken, name="triage"))(_state(), runtime=runtime)
+    # Skipped after the failure: not a step.
+    await build.guarded(_spec(fine, name="write"))(_state(errors=["triage:X"]), runtime=runtime)
+    timeout = build.guarded(
+        _spec(slow, name="research", timeout_s=0.01, on_timeout=build.research_timed_out)
+    )
+    await timeout(_state(), runtime=runtime)
+    with pytest.raises(GraphInterrupt):
+        await build.guarded(_spec(pause, name="human_review"))(_state(), runtime=runtime)
+    with pytest.raises(RuntimeError):
+        await build.guarded(_spec(broken, name="act", catches=False))(_state(), runtime=runtime)
+
+    assert [(step.node, step.outcome) for step in ctx.steps] == [
+        ("intake", "ok"),
+        ("triage", "error"),
+        ("research", "timeout"),
+        ("human_review", "paused"),
+        ("act", "error"),
+    ]
+    assert all(step.duration_ms >= 0 for step in ctx.steps)
+    assert ctx.steps[2].duration_ms >= 10
+    stored = ctx.steps[0].stored()
+    assert set(stored) == {"node", "started_at", "duration_ms", "outcome"}
+    assert datetime.fromisoformat(str(stored["started_at"])).tzinfo is not None
+
+
+def test_the_trace_shows_the_outcome_of_an_invoke_without_text() -> None:
+    final = {
+        "route": "approval",
+        "route_reasons": ["low_confidence"],
+        "confidence": 0.6,
+        "ticket_status": "pending_approval",
+        "errors": [],
+        "message_for_llm": "customer text",
+        "__interrupt__": (),
+    }
+    summary = run_module.run_summary(final)
+    assert summary["paused"] is True
+    assert summary["route"] == "approval"
+    assert "customer text" not in str(summary)
+    assert run_module.run_summary(None) == {}
 
 
 def test_which_nodes_fail_into_a_handoff() -> None:

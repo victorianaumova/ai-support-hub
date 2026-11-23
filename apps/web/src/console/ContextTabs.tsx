@@ -222,11 +222,36 @@ export function ContextTabs({ ticket, focused }: { ticket: Ticket; focused: numb
                 <dt className="text-muted">Prompts</dt>
                 <dd>{Object.entries(run.prompt_versions).map(([node, v]) => `${node} ${v}`).join(", ") || "—"}</dd>
                 <dt className="text-muted">Trace</dt>
-                <dd className="text-muted">Not available (tracing removed, ADR-0019)</dd>
+                <dd>
+                  {ticket.trace_url ? (
+                    <a href={ticket.trace_url} target="_blank" rel="noopener noreferrer" className="text-brand-700 underline">
+                      Open in Langfuse
+                    </a>
+                  ) : run.trace_id ? (
+                    <span className="font-mono text-xs">{run.trace_id}</span>
+                  ) : (
+                    <span className="text-muted">Not traced</span>
+                  )}
+                </dd>
               </dl>
             )}
+            {run !== null && (
+              <>
+                <h3 className="mt-3 font-semibold">Steps</h3>
+                {run.steps.length === 0 ? (
+                  <p className="text-muted">No steps recorded.</p>
+                ) : (
+                  <ol className="space-y-1">
+                    {run.steps.map((step, index) => (
+                      <li key={`${step.node}-${index}`}>
+                        {step.node} · {step.duration_ms} ms{step.outcome === "ok" ? "" : ` · ${step.outcome}`}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </>
+            )}
             <h3 className="mt-3 font-semibold">Model calls</h3>
-            <p className="text-xs text-muted">Durations per step come with P9-01; these are the recorded calls.</p>
             {modelCalls.length === 0 ? (
               <p className="text-muted">None.</p>
             ) : (

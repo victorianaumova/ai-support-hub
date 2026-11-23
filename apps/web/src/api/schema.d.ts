@@ -879,8 +879,9 @@ export interface components {
         /**
          * ConsoleTicketOut
          * @description `GET /console/tickets/{id}`. Fields of later phases are present and empty until then:
-         *     evidence chunks (phase 5; the B0 cited documents are in `draft.evidence`), trace URL
-         *     (phase 9, removed by ADR-0019). `memory` (P6-05): the customer's memory items that have not
+         *     evidence chunks (phase 5; the B0 cited documents are in `draft.evidence`). `trace_url`
+         *     (P9-01): the latest run's trace in Langfuse, null without a trace id or without
+         *     `LANGFUSE_PROJECT_ID`. `memory` (P6-05): the customer's memory items that have not
          *     expired, newest first, at most 5, without this ticket's own.
          */
         ConsoleTicketOut: {
@@ -931,7 +932,7 @@ export interface components {
             /** Tool Calls */
             tool_calls?: components["schemas"]["ToolCallOut"][];
             /** Trace Url */
-            trace_url?: null;
+            trace_url?: string | null;
             urgency: components["schemas"]["Urgency"] | null;
             /** Version */
             version: number;
@@ -1353,7 +1354,7 @@ export interface components {
         /**
          * ModelCallOut
          * @description One model call attempt of the latest run (data model, `llm_calls`): no text, only what the
-         *     Run tab shows (P10-03 review). Per-step durations come with P9-01.
+         *     Run tab shows (P10-03 review). Per-step durations are in `RunOut.steps` (P9-01).
          */
         ModelCallOut: {
             /** Cost Usd */
@@ -1609,8 +1610,12 @@ export interface components {
              */
             started_at: string;
             status: components["schemas"]["RunStatus"];
+            /** Steps */
+            steps: components["schemas"]["RunStepOut"][];
             /** Total Cost Usd */
             total_cost_usd: string;
+            /** Trace Id */
+            trace_id: string | null;
         };
         /**
          * RunStatus
@@ -1618,6 +1623,27 @@ export interface components {
          * @enum {string}
          */
         RunStatus: "running" | "interrupted" | "completed" | "failed";
+        /**
+         * RunStepOut
+         * @description One node of the run with its duration (data model, `runs.steps`; P9-01). A resumed run
+         *     lists `human_review` twice: `paused`, then `ok` after the operator's decision.
+         */
+        RunStepOut: {
+            /** Duration Ms */
+            duration_ms: number;
+            /** Node */
+            node: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "ok" | "error" | "timeout" | "paused";
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+        };
         /** SearchHitOut */
         SearchHitOut: {
             /** Chunk Id */
