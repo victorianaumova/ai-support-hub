@@ -25,6 +25,7 @@ from hub.db.models import (
     CustomerMemory,
     Draft,
     Feedback,
+    LlmCall,
     Message,
     Operator,
     Run,
@@ -465,6 +466,18 @@ class ToolCallRepository:
             .join(Run, Run.id == ToolCall.run_id)
             .where(Run.ticket_id == ticket_id)
             .order_by(ToolCall.created_at, ToolCall.id)
+        )
+        return result.scalars().all()
+
+
+class LlmCallRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def for_run(self, run_id: uuid.UUID) -> Sequence[LlmCall]:
+        """The model call attempts of one run, oldest first (the console's Run tab, P10-03)."""
+        result = await self._session.execute(
+            select(LlmCall).where(LlmCall.run_id == run_id).order_by(LlmCall.created_at, LlmCall.id)
         )
         return result.scalars().all()
 

@@ -25,7 +25,6 @@ export function SettingsPage() {
   const evals = useQuery({ queryKey: ["console", "evals"], queryFn: async () => unwrap(await api.GET("/api/v1/console/evals/latest")).run });
   const [pending, setPending] = useState<Change | null>(null);
   const [reason, setReason] = useState("");
-  const [threshold, setThreshold] = useState<number | null>(null);
   const [budget, setBudget] = useState("");
   const save = useMutation({
     mutationFn: async (body: components["schemas"]["SettingsIn"]) => unwrap(await api.PUT("/api/v1/admin/settings", { body })),
@@ -39,7 +38,7 @@ export function SettingsPage() {
   if (settings.isPending) return <Loading label="Loading the settings" />;
   if (settings.isError) return <ErrorState error={settings.error} onRetry={() => void settings.refetch()} />;
   const s = settings.data;
-  const shownThreshold = threshold ?? s.confidence_threshold ?? 0.95;
+  const shownThreshold = s.confidence_threshold ?? 0.95;
   const ask = (change: Change) => {
     save.reset();
     setReason("");
@@ -72,13 +71,12 @@ export function SettingsPage() {
         <label htmlFor="threshold" className="mt-2 block text-sm">
           Auto-reply only at a confidence of at least <strong className="tabular-nums">{shownThreshold.toFixed(2)}</strong>
         </label>
-        <input id="threshold" type="range" min={0.5} max={1} step={0.01} value={shownThreshold} onChange={(e) => { setThreshold(Number(e.target.value)); }} className="mt-1 w-full" />
-        <p className="mt-1 text-xs text-muted">
-          The last evaluation has no per-ticket confidences in its committed report, so how many tickets this threshold would auto-reply is not shown.
+        {/* UI §4 (owner decision, PR #66): no counts next to the slider; the confidence
+            threshold task was cut and auto-reply stays off in the demo (ADR-0019). */}
+        <input id="threshold" type="range" min={0.5} max={1} step={0.01} value={shownThreshold} disabled aria-describedby="threshold-note" className="mt-1 w-full" />
+        <p id="threshold-note" className="mt-1 text-sm text-muted">
+          Auto-reply is off in this demo.
         </p>
-        <button type="button" disabled={threshold === null || threshold === s.confidence_threshold} onClick={() => { ask({ confidence_threshold: shownThreshold }); }} className="mt-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-50">
-          Save threshold…
-        </button>
       </section>
 
       <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4">

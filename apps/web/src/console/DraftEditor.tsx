@@ -1,5 +1,6 @@
-import { type Ref, useState } from "react";
+import { type Ref, useEffect, useRef, useState } from "react";
 import { SafeText } from "../text/SafeText";
+import { shortcut } from "./keys";
 import { type Citation, type Draft, draftParts, type RejectReason } from "./useTicket";
 
 const REJECT_REASONS: { value: RejectReason; label: string }[] = [
@@ -25,9 +26,11 @@ export interface DraftActions {
 }
 
 /** UI §3 work area: editable draft, citation chips, unsupported claims, proposed actions, and
- * Approve / Send edited / Reject. "Approve and send" is off after any edit. */
+ * Approve / Send edited / Reject. "Approve and send" is off after any edit, for the button and
+ * the `A` shortcut alike: both approve with the ticked actions, once. */
 export function DraftEditor({
   draft,
+  reviewable,
   editorRef,
   onCite,
   actions,
@@ -35,6 +38,8 @@ export function DraftEditor({
   setRejectOpen,
 }: {
   draft: Draft;
+  // The draft waits for review on a `pending_approval` ticket.
+  reviewable: boolean;
   editorRef: Ref<HTMLTextAreaElement>;
   onCite: (marker: number) => void;
   actions: DraftActions;
@@ -50,6 +55,34 @@ export function DraftEditor({
   const edited = text.trim() !== draft.body.trim();
   const unknown = unknownMarkers(text, parts.citations);
   const pending = draft.status === "pending";
+  const canApprove = reviewable && pending && draft.can_answer && !edited && !actions.busy;
+  // `busy` turns true only after a render; a second press before it must not send again. The
+  // editor is keyed by draft and ticket version, so a new state starts with a fresh flag.
+  const sent = useRef(false);
+  const approve = () => {
+    if (!canApprove || sent.current) return;
+    sent.current = true;
+    actions.approve(ticked);
+  };
+  // The key listener is added once and calls the approve of the latest render.
+  const latest = useRef(approve);
+  useEffect(() => {
+    latest.current = approve;
+  });
+  useEffect(() => {
+    if (!actions.busy) sent.current = false;
+  }, [actions.busy]);
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (shortcut(event) !== "a") return;
+      event.preventDefault();
+      latest.current();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
 
   return (
     <section aria-labelledby="draft-heading" className="rounded-lg border border-slate-200 bg-white p-4">
@@ -145,11 +178,9 @@ export function DraftEditor({
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={actions.busy || edited || !draft.can_answer}
+            disabled={!canApprove}
             title={edited ? "You changed the text: use Send edited" : "A"}
-            onClick={() => {
-              actions.approve(ticked);
-            }}
+            onClick={approve}
             className="rounded-md bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
             Approve and send

@@ -36,6 +36,7 @@ from hub.api.console_schemas import (
     ConsoleTicketOut,
     DraftOut,
     MemoryOut,
+    ModelCallOut,
     QueueTicketOut,
     ReplyIn,
     RunOut,
@@ -58,6 +59,7 @@ from hub.db.models import Message, Operator, Ticket
 from hub.db.repositories import (
     ConcurrentUpdateError,
     DraftRepository,
+    LlmCallRepository,
     MemoryRepository,
     MessageRepository,
     QueueCursor,
@@ -286,6 +288,7 @@ async def get_ticket(
     run = await RunRepository(session).latest_for_ticket(ticket.id)
     draft = None if run is None else await DraftRepository(session).for_run(run.id)
     tool_calls = await ToolCallRepository(session).for_ticket(ticket.id)
+    model_calls = [] if run is None else await LlmCallRepository(session).for_run(run.id)
     memory = await MemoryRepository(session).active_for_customer(
         ticket.customer_id, limit=MEMORY_ITEMS, exclude_ticket=ticket.id
     )
@@ -311,6 +314,7 @@ async def get_ticket(
             for item, intent in memory
         ],
         tool_calls=[ToolCallOut.model_validate(call) for call in tool_calls],
+        model_calls=[ModelCallOut.model_validate(call) for call in model_calls],
     )
 
 

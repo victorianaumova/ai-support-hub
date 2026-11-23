@@ -5,7 +5,7 @@ ids). It is never returned by a customer endpoint.
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
@@ -17,6 +17,8 @@ from hub.domain.enums import (
     CustomerTier,
     DraftStatus,
     Intent,
+    LlmCallStatus,
+    LlmNode,
     MessageRole,
     OperatorRole,
     RejectReason,
@@ -258,6 +260,24 @@ class ToolCallOut(BaseModel):
     created_at: datetime
 
 
+class ModelCallOut(BaseModel):
+    """One model call attempt of the latest run (data model, `llm_calls`): no text, only what the
+    Run tab shows (P10-03 review). Per-step durations come with P9-01."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    node: LlmNode
+    model: str
+    prompt_version: str | None
+    status: LlmCallStatus
+    latency_ms: int
+    cost_usd: Decimal
+    input_tokens: int
+    output_tokens: int
+    created_at: datetime
+
+
 class ConsoleTicketOut(QueueTicketOut):
     """`GET /console/tickets/{id}`. Fields of later phases are present and empty until then:
     evidence chunks (phase 5; the B0 cited documents are in `draft.evidence`), trace URL
@@ -278,4 +298,57 @@ class ConsoleTicketOut(QueueTicketOut):
     memory: list[MemoryOut] = Field(default_factory=list)
     # Every tool call of the ticket's runs, oldest first (P7-05).
     tool_calls: list[ToolCallOut] = Field(default_factory=list)
+    # The model call attempts of the latest run, oldest first (P10-03 review).
+    model_calls: list[ModelCallOut] = Field(default_factory=list)
     trace_url: None = None
+
+
+# --- account view (P10-03 review) -------------------------------------------------------------
+
+
+class LimitOut(BaseModel):
+    name: str
+    limit_eur: Decimal
+    # Per currency, not converted (the core mock has no exchange rates).
+    used: dict[str, Decimal]
+
+
+class AccountProfileOut(BaseModel):
+    tier: str
+    country: str
+    # The flag only, never the reason (tipping-off rule, world file §6).
+    restricted: bool
+    limits: list[LimitOut]
+    as_of: date
+
+
+class CardOut(BaseModel):
+    card_ref: str
+    kind: str
+    last4: str
+    status: str
+    delivery_status: str | None
+    expected_delivery_by: date | None
+    delivery_overdue: bool
+
+
+class TransactionOut(BaseModel):
+    reference: str
+    type: str
+    amount: Decimal
+    currency: str
+    status: str
+    error_code: str | None
+    requested_at: datetime
+
+
+class AccountOut(BaseModel):
+    """`GET /console/tickets/{id}/account`: what the core read tools return now for the ticket's
+    customer, read through the tool permissions (node `console`). A part is null when its call
+    was refused or failed; `unavailable` names those parts, so the console shows them as unknown,
+    never as "no" (a null `profile` means the restricted flag is unknown)."""
+
+    profile: AccountProfileOut | None
+    cards: list[CardOut] | None
+    transactions: list[TransactionOut] | None
+    unavailable: list[Literal["profile", "cards", "transactions"]]

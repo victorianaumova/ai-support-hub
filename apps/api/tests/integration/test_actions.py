@@ -399,6 +399,102 @@ def test_the_operator_action_checks_the_ticket_and_the_request(stack: Stack) -> 
     assert _side_effects(stack.urls) == []
 
 
+# --- the console's account view (P10-03 review) -------------------------------------------------
+
+
+def _fees_handoff(stack: Stack) -> uuid.UUID:
+    return _post(
+        stack,
+        "I would like to talk to a person about fees.",
+        _handoff_run(intent="fees_fx", asks_for_action="none", wants_human=True),
+    )
+
+
+def test_the_account_view_reads_the_core_tools_through_the_permissions(stack: Stack) -> None:
+    """UI §3 *Customer* tab: limits used, restricted flag, cards and recent transactions of the
+    ticket's own customer, read through `hub.tools` (node `console`) and recorded."""
+    ticket_id = _fees_handoff(stack)
+    operator = _operator(stack)
+
+    response = operator.get(f"/api/v1/console/tickets/{ticket_id}/account")
+
+    assert response.status_code == 200, response.text
+    account = response.json()
+    assert account["unavailable"] == []
+    profile = account["profile"]
+    assert (profile["tier"], profile["country"], profile["restricted"]) == ("verified", "ES", False)
+    assert {limit["name"] for limit in profile["limits"]} >= {"withdraw_per_day"}
+    assert "restriction_reason" not in json.dumps(account)
+    assert {card["card_ref"]: card["last4"] for card in account["cards"]} == {
+        "CRD-0001": "2018",
+        "CRD-0002": "2086",
+    }
+    assert 0 < len(account["transactions"]) <= 10
+    assert all(tx["reference"].startswith("TX-") for tx in account["transactions"])
+    rows = run_sql(
+        stack.urls,
+        "SELECT tool, status, arguments, side_effect FROM tool_calls WHERE node = 'console'"
+        " ORDER BY created_at",
+    )
+    assert [(tool, status) for tool, status, _, _ in rows] == [
+        ("core_get_customer", "ok"),
+        ("core_get_cards", "ok"),
+        ("core_list_transactions", "ok"),
+    ]
+    # The customer comes from the tickets row, never from the request.
+    assert {arguments["customer_ref"] for _, _, arguments, _ in rows} == {"CUS-0001"}
+    assert not any(side_effect for *_, side_effect in rows)
+    audited = run_sql(
+        stack.urls,
+        "SELECT count(*) FROM audit_log WHERE action = 'tool.called'"
+        " AND details ->> 'node' = 'console'",
+    )
+    assert audited == [(3,)]
+    # The Run tab: the recorded model calls of the latest run with their latencies.
+    calls = _detail(operator, ticket_id)["model_calls"]
+    assert [call["node"] for call in calls] == ["triage", "handoff_prep"]
+    assert all(call["latency_ms"] >= 0 and call["model"] for call in calls)
+
+
+def test_the_account_view_is_unknown_when_the_core_fails_or_the_limit_is_used(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ticket_id = _fees_handoff(stack)
+    operator = _operator(stack)
+    url = f"/api/v1/console/tickets/{ticket_id}/account"
+    _failing(monkeypatch, "core_get_customer")
+
+    failed = operator.get(url).json()
+
+    # Unknown, never "not restricted".
+    assert failed["profile"] is None
+    assert failed["unavailable"] == ["profile"]
+    assert failed["cards"] is not None
+    monkeypatch.undo()
+    for _ in range(9):
+        assert operator.get(url).json()["unavailable"] == []
+    # 30 calls per run: the eleventh view is refused by the permissions and recorded.
+    refused = operator.get(url).json()
+    assert refused["unavailable"] == ["profile", "cards", "transactions"]
+    denied = run_sql(
+        stack.urls,
+        "SELECT count(*) FROM tool_calls WHERE node = 'console' AND status = 'denied'",
+    )
+    assert denied == [(3,)]
+
+
+def test_the_account_view_checks_the_ticket_and_the_role(stack: Stack) -> None:
+    operator = _operator(stack)
+    unknown = operator.get(f"/api/v1/console/tickets/{uuid.uuid4()}/account")
+    assert unknown.status_code == 404
+    ticket_id = _fees_handoff(stack)
+    add_operator(stack.urls, "eva@tallybridge.test", "compliance", name="Eva Horváth")
+    compliance = _operator(stack, "eva@tallybridge.test")
+    refused = compliance.get(f"/api/v1/console/tickets/{ticket_id}/account")
+    assert refused.status_code == 403
+    assert run_sql(stack.urls, "SELECT count(*) FROM tool_calls WHERE node = 'console'") == [(0,)]
+
+
 # --- failures and limits (PR #42 review) --------------------------------------------------------
 
 

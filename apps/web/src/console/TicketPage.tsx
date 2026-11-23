@@ -7,14 +7,11 @@ import { Loading } from "../components/Loading";
 import { SafeText } from "../text/SafeText";
 import { ContextTabs } from "./ContextTabs";
 import { DraftEditor } from "./DraftEditor";
+import { shortcut } from "./keys";
 import { reasonText, words } from "./labels";
 import { neighbour } from "./queue";
+import { isUrgent } from "./sla";
 import { type Ticket, useTicket } from "./useTicket";
-
-/** Keys typed into a field are text, not shortcuts. */
-function typing(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
-}
 
 function actionError(error: unknown): string {
   if (error instanceof ApiError) {
@@ -62,9 +59,9 @@ export function TicketPage() {
   const busy = t.review.isPending || t.claim.isPending || t.release.isPending || t.close.isPending || t.reply.isPending;
 
   useEffect(() => {
+    // `A` lives in DraftEditor, which holds the edited text and the ticked actions.
     function onKey(event: KeyboardEvent) {
-      if (event.metaKey || event.ctrlKey || event.altKey || typing(event.target)) return;
-      const key = event.key.toLowerCase();
+      const key = shortcut(event);
       if (key === "j" || key === "k") {
         const next = neighbour(id, key === "j" ? 1 : -1);
         if (next !== null) void navigate(`/console/tickets/${next}`);
@@ -73,15 +70,13 @@ export function TicketPage() {
         editor.current?.focus();
       } else if (key === "r" && reviewable) {
         setRejectOpen(true);
-      } else if (key === "a" && reviewable && draft.can_answer) {
-        t.review.mutate({ kind: "approve", draftId: draft.id, actions: [] });
       }
     }
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
     };
-  }, [draft, id, navigate, reviewable, t.review]);
+  }, [id, navigate, reviewable]);
 
   if (t.ticket.isPending) return <Loading label="Loading the ticket" />;
   if (t.ticket.isError) return <ErrorState error={t.ticket.error} onRetry={() => void t.ticket.refetch()} />;
@@ -99,7 +94,7 @@ export function TicketPage() {
           {data.customer.display_name} · {words(data.intent)}
         </h1>
         <span className="rounded bg-slate-100 px-2 py-0.5 text-sm">{words(data.status)}</span>
-        {data.urgency === "high" && <span className="rounded bg-red-100 px-2 py-0.5 text-sm font-semibold text-red-900">⚑ Urgent</span>}
+        {isUrgent(data) && <span className="rounded bg-red-100 px-2 py-0.5 text-sm font-semibold text-red-900">⚑ Urgent</span>}
         <span className="text-sm text-muted">{data.assigned_operator ? `Claimed by ${data.assigned_operator.name}` : "Not claimed"}</span>
         <div className="ml-auto flex flex-wrap gap-2">
           {data.status !== "closed" && !mine && (
@@ -164,6 +159,7 @@ export function TicketPage() {
             <DraftEditor
               key={`${draft.id}-${data.version}`}
               draft={draft}
+              reviewable={reviewable}
               editorRef={editor}
               onCite={(marker) => {
                 setFocused(marker);

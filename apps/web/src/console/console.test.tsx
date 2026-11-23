@@ -238,4 +238,128 @@ describe("ticket workspace", () => {
       expect(router.state.location.pathname).toBe("/console/tickets/t2");
     });
   });
+
+  it("keyboard: A outside a field approves with the ticked actions, once", async () => {
+    let release: (value: Response) => void = () => undefined;
+    const calls = serve({
+      // The approve hangs, so the second press comes while the first is still on its way.
+      "POST /api/v1/console/drafts/d1/approve": () => new Response(JSON.stringify({ draft: DRAFT, message: null, ticket: ROW })),
+    });
+    const fetchMock = vi.mocked(fetch);
+    const real = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation(async (input) => {
+      const request = input as Request;
+      if (request.url.endsWith("/approve")) {
+        await new Promise<Response>((resolve) => {
+          release = resolve;
+        });
+      }
+      return (real as (r: Request) => Promise<Response>)(request);
+    });
+    renderApp("/console/tickets/t1");
+    await screen.findByRole("heading", { name: "AI draft" });
+    await userEvent.click(screen.getByRole("checkbox"));
+    (document.activeElement as HTMLElement).blur();
+
+    await userEvent.keyboard("a");
+    await userEvent.keyboard("a");
+    release(new Response());
+
+    await waitFor(() => {
+      expect(calls.filter((c) => c.path === "/api/v1/console/drafts/d1/approve")).toHaveLength(1);
+    });
+    expect(calls.find((c) => c.path === "/api/v1/console/drafts/d1/approve")?.body).toEqual({ ticket_version: 3, approved_actions: ["a1"] });
+  });
+
+  it("keyboard: A after an edit does nothing (Send edited is the way)", async () => {
+    const calls = serve();
+    renderApp("/console/tickets/t1");
+    const box = await screen.findByLabelText(/Answer to the customer/);
+    await userEvent.type(box, " Thanks.");
+    box.blur();
+
+    await userEvent.keyboard("a");
+
+    expect(screen.getByRole("button", { name: "Approve and send" })).toBeDisabled();
+    expect(calls.some((c) => c.path.endsWith("/approve"))).toBe(false);
+  });
+
+  it("an internal source is plain text, not a help link", async () => {
+    const internal = { chunk_id: "ch9", doc_id: "ops-manual", title: "Ops manual", section: "Holds", url: "/help/ops-manual#holds", visibility: "internal", score: 0.4, rank: 3, text: "Internal text" };
+    serve({
+      "GET /api/v1/console/tickets/t1": () =>
+        new Response(JSON.stringify({ ...TICKET, draft: { ...DRAFT, evidence: { chunks: [...DRAFT.evidence.chunks, internal] } } })),
+    });
+    renderApp("/console/tickets/t1");
+    await screen.findByRole("heading", { name: "AI draft" });
+    const panel = screen.getByRole("tabpanel");
+    expect(within(panel).getByText("Ops manual").closest("a")).toBeNull();
+    expect(within(panel).getByRole("link", { name: "Fees" })).toHaveAttribute("href", "/help/fees#fees");
+  });
+
+  it("the Run tab lists the recorded model calls with their latency", async () => {
+    const call = { id: "l1", node: "triage", model: "gpt-x", prompt_version: "triage/v1", status: "ok", latency_ms: 812, cost_usd: "0.000400", input_tokens: 500, output_tokens: 50, created_at: ROW.created_at };
+    serve({ "GET /api/v1/console/tickets/t1": () => new Response(JSON.stringify({ ...TICKET, model_calls: [call] })) });
+    renderApp("/console/tickets/t1");
+    await userEvent.click(await screen.findByRole("tab", { name: "Run" }));
+    expect(screen.getByText(/triage\/v1 · ok · 812 ms/)).toBeInTheDocument();
+    expect(screen.getByText(/Durations per step come with P9-01/)).toBeInTheDocument();
+  });
+});
+
+const ACCOUNT = {
+  profile: {
+    tier: "verified",
+    country: "ES",
+    restricted: false,
+    limits: [{ name: "withdraw_per_day", limit_eur: "5000.00", used: { EUR: "250.00" } }],
+    as_of: "2026-11-12",
+  },
+  cards: [{ card_ref: "CRD-0001", kind: "physical", last4: "2018", status: "active", delivery_status: "delivered", expected_delivery_by: null, delivery_overdue: false }],
+  transactions: [{ reference: "TX-000001", type: "sepa_withdrawal", amount: "250.00", currency: "EUR", status: "pending", error_code: null, requested_at: "2026-11-10T09:00:00Z" }],
+  unavailable: [],
+};
+
+describe("customer tab", () => {
+  it("shows limits used, the restricted flag, cards and recent transactions, read once", async () => {
+    const calls = serve({ "GET /api/v1/console/tickets/t1/account": () => new Response(JSON.stringify(ACCOUNT)) });
+    renderApp("/console/tickets/t1");
+    await userEvent.click(await screen.findByRole("tab", { name: "Customer" }));
+    const panel = screen.getByRole("tabpanel");
+
+    expect(await within(panel).findByText(/withdraw per day/i)).toBeInTheDocument();
+    expect(within(panel).getByText("Restricted").nextElementSibling).toHaveTextContent("No");
+    expect(within(panel).getByText(/•••• 2018/)).toBeInTheDocument();
+    expect(within(panel).getByText("TX-000001")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Sources" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Customer" }));
+    expect(calls.filter((c) => c.path.endsWith("/account"))).toHaveLength(1);
+  });
+
+  it("says Unknown, never No, when the profile could not be read", async () => {
+    serve({
+      "GET /api/v1/console/tickets/t1/account": () =>
+        new Response(JSON.stringify({ ...ACCOUNT, profile: null, unavailable: ["profile"] })),
+    });
+    renderApp("/console/tickets/t1");
+    await userEvent.click(await screen.findByRole("tab", { name: "Customer" }));
+    const panel = screen.getByRole("tabpanel");
+
+    expect(await within(panel).findByText(/the limits could not be read/)).toBeInTheDocument();
+    expect(within(panel).getByText("Restricted").nextElementSibling).toHaveTextContent("Unknown");
+    expect(within(panel).queryByText("Not flagged by this run")).toBeNull();
+  });
+
+  it("says Unknown when the account API fails", async () => {
+    serve({
+      "GET /api/v1/console/tickets/t1/account": () =>
+        new Response(JSON.stringify({ status: 503, code: "tools_unavailable", title: "", detail: "" }), { status: 503 }),
+    });
+    renderApp("/console/tickets/t1");
+    await userEvent.click(await screen.findByRole("tab", { name: "Customer" }));
+    const panel = screen.getByRole("tabpanel");
+
+    expect(await within(panel).findByRole("alert")).toHaveTextContent("unknown");
+    expect(within(panel).getByText("Restricted").nextElementSibling).toHaveTextContent("Unknown");
+  });
 });

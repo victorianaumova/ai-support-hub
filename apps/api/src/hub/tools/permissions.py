@@ -74,6 +74,8 @@ ALLOWLIST: Mapping[ToolNode, frozenset[str]] = {
     ),
     ToolNode.HANDOFF_PREP: frozenset({"slack_post_escalation"}),
     ToolNode.ACT: frozenset({"jira_create_issue"}),
+    # The operator's account view (P10-03 review): the three read tools, never a side effect.
+    ToolNode.CONSOLE: frozenset({"core_get_customer", "core_list_transactions", "core_get_cards"}),
 }
 
 MAX_CALLS_PER_RUN: Mapping[ToolNode, int] = {
@@ -81,6 +83,9 @@ MAX_CALLS_PER_RUN: Mapping[ToolNode, int] = {
     ToolNode.RESEARCH: 5,
     ToolNode.HANDOFF_PREP: 1,
     ToolNode.ACT: 1,
+    # Three calls per view of the Customer tab: ten views of one run, then `run_limit` (the tab
+    # shows the data as unknown). The console keeps the answer for the page's lifetime.
+    ToolNode.CONSOLE: 30,
 }
 MAX_SIDE_EFFECTS_PER_TICKET = 1
 

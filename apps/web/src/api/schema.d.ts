@@ -375,6 +375,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/console/tickets/{ticket_id}/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Account */
+        get: operations["get_account_api_v1_console_tickets__ticket_id__account_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/console/tickets/{ticket_id}/actions": {
         parameters: {
             query?: never;
@@ -685,6 +702,38 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AccountOut
+         * @description `GET /console/tickets/{id}/account`: what the core read tools return now for the ticket's
+         *     customer, read through the tool permissions (node `console`). A part is null when its call
+         *     was refused or failed; `unavailable` names those parts, so the console shows them as unknown,
+         *     never as "no" (a null `profile` means the restricted flag is unknown).
+         */
+        AccountOut: {
+            /** Cards */
+            cards: components["schemas"]["CardOut"][] | null;
+            profile: components["schemas"]["AccountProfileOut"] | null;
+            /** Transactions */
+            transactions: components["schemas"]["TransactionOut"][] | null;
+            /** Unavailable */
+            unavailable: ("profile" | "cards" | "transactions")[];
+        };
+        /** AccountProfileOut */
+        AccountProfileOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Country */
+            country: string;
+            /** Limits */
+            limits: components["schemas"]["LimitOut"][];
+            /** Restricted */
+            restricted: boolean;
+            /** Tier */
+            tier: string;
+        };
+        /**
          * ActionIn
          * @description `POST /console/tickets/{id}/actions`: one tool action run by an operator (api.md §3).
          */
@@ -743,6 +792,23 @@ export interface components {
             daily_limit_usd: number;
             /** Spent Today Usd */
             spent_today_usd: number;
+        };
+        /** CardOut */
+        CardOut: {
+            /** Card Ref */
+            card_ref: string;
+            /** Delivery Overdue */
+            delivery_overdue: boolean;
+            /** Delivery Status */
+            delivery_status: string | null;
+            /** Expected Delivery By */
+            expected_delivery_by: string | null;
+            /** Kind */
+            kind: string;
+            /** Last4 */
+            last4: string;
+            /** Status */
+            status: string;
         };
         /**
          * ChainCheck
@@ -851,6 +917,8 @@ export interface components {
             memory?: components["schemas"]["MemoryOut"][];
             /** Messages */
             messages: components["schemas"]["ConsoleMessageOut"][];
+            /** Model Calls */
+            model_calls?: components["schemas"]["ModelCallOut"][];
             /** Resolution */
             resolution: string | null;
             /** Resolved At */
@@ -1192,6 +1260,31 @@ export interface components {
             /** Visibility */
             visibility: string;
         };
+        /** LimitOut */
+        LimitOut: {
+            /** Limit Eur */
+            limit_eur: string;
+            /** Name */
+            name: string;
+            /** Used */
+            used: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * LlmCallStatus
+         * @description `retry`: this attempt failed and the gateway tries again; `error`: it failed for good
+         *     (the gateway may still go on to the fallback model); `invalid_output`: the answer did not
+         *     match the schema (P3-02).
+         * @enum {string}
+         */
+        LlmCallStatus: "ok" | "retry" | "error" | "invalid_output";
+        /**
+         * LlmNode
+         * @description The step that made a model call (data model §1, `llm_calls.node`).
+         * @enum {string}
+         */
+        LlmNode: "triage" | "research" | "write" | "verify" | "handoff_prep" | "memory_summary" | "judge" | "embedding";
         /** LoginIn */
         LoginIn: {
             /** Email */
@@ -1257,6 +1350,37 @@ export interface components {
          * @enum {string}
          */
         MessageRole: "customer" | "assistant" | "operator" | "system";
+        /**
+         * ModelCallOut
+         * @description One model call attempt of the latest run (data model, `llm_calls`): no text, only what the
+         *     Run tab shows (P10-03 review). Per-step durations come with P9-01.
+         */
+        ModelCallOut: {
+            /** Cost Usd */
+            cost_usd: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Latency Ms */
+            latency_ms: number;
+            /** Model */
+            model: string;
+            node: components["schemas"]["LlmNode"];
+            /** Output Tokens */
+            output_tokens: number;
+            /** Prompt Version */
+            prompt_version: string | null;
+            status: components["schemas"]["LlmCallStatus"];
+        };
         /** OperatorOut */
         OperatorOut: {
             /** Email */
@@ -1688,7 +1812,27 @@ export interface components {
          * @description The graph nodes that call tools (`tool_calls.node`, security G6, P7-04).
          * @enum {string}
          */
-        ToolNode: "intake" | "research" | "handoff_prep" | "act";
+        ToolNode: "intake" | "research" | "handoff_prep" | "act" | "console";
+        /** TransactionOut */
+        TransactionOut: {
+            /** Amount */
+            amount: string;
+            /** Currency */
+            currency: string;
+            /** Error Code */
+            error_code: string | null;
+            /** Reference */
+            reference: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Status */
+            status: string;
+            /** Type */
+            type: string;
+        };
         /**
          * Urgency
          * @enum {string}
@@ -2457,6 +2601,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConsoleTicketOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_account_api_v1_console_tickets__ticket_id__account_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                ticket_id: string;
+            };
+            cookie?: {
+                hub_operator?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountOut"];
                 };
             };
             /** @description Validation Error */

@@ -21,6 +21,8 @@ export interface EvidenceChunk {
   title: string;
   section: string;
   url: string;
+  // Not stored by the research step today (it keeps external chunks only); read defensively.
+  visibility?: "internal" | "external";
   score: number;
   rank: number;
   text: string;

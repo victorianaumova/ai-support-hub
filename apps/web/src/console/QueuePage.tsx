@@ -4,7 +4,7 @@ import { ErrorState } from "../components/ErrorState";
 import { Loading } from "../components/Loading";
 import { INTENTS, REASONS, reasonText, words } from "./labels";
 import { type Filters, type QueueRow, rememberOrder, TABS, type TabId, useQueue } from "./queue";
-import { isOverdue, waited } from "./sla";
+import { isOverdue, isUrgent, waited } from "./sla";
 
 const EMPTY: Filters = { intent: "", urgency: "", reason: "", q: "" };
 
@@ -15,7 +15,7 @@ function Counter({ tab, filters }: { tab: TabId; filters: Filters }) {
 }
 
 function Row({ row, isNew, now }: { row: QueueRow; isNew: boolean; now: Date }) {
-  const urgent = row.urgency === "high";
+  const urgent = isUrgent(row);
   const late = isOverdue(row.waiting_since, urgent, now);
   return (
     <tr className={`border-t border-slate-200 ${isNew ? "bg-amber-50" : "bg-white"}`}>

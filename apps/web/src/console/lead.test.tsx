@@ -128,13 +128,48 @@ describe("settings", () => {
     });
   });
 
-  it("Escape closes the dialog without a change", async () => {
+  it("Escape closes the dialog without a change, and focus returns to the opener", async () => {
     const calls = serve();
     renderApp("/console/settings");
-    await userEvent.click(await screen.findByRole("switch"));
+    const opener = await screen.findByRole("switch");
+    await userEvent.click(opener);
+    const reason = within(screen.getByRole("dialog")).getByLabelText(/Reason/);
+    expect(reason).toHaveFocus();
+    // Typing re-renders the page with a new onClose each time; focus must stay in the field.
+    await userEvent.type(reason, "Typing a reason");
+    expect(reason).toHaveFocus();
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
+    expect(opener).toHaveFocus();
     expect(calls.some((c) => c.method === "PUT")).toBe(false);
+  });
+
+  it("Tab stays inside the dialog", async () => {
+    serve();
+    renderApp("/console/settings");
+    await userEvent.click(await screen.findByRole("checkbox", { name: "withdrawal issue" }));
+    const dialog = screen.getByRole("dialog");
+    await userEvent.type(within(dialog).getByLabelText(/Reason/), "abc");
+    const cancel = within(dialog).getByRole("button", { name: "Cancel" });
+    const confirm = within(dialog).getByRole("button", { name: "Confirm change" });
+    const reason = within(dialog).getByLabelText(/Reason/);
+    await userEvent.tab();
+    expect(cancel).toHaveFocus();
+    await userEvent.tab();
+    expect(confirm).toHaveFocus();
+    await userEvent.tab();
+    expect(reason).toHaveFocus();
+    await userEvent.tab({ shift: true });
+    expect(confirm).toHaveFocus();
+  });
+
+  it("the threshold slider is off: auto-reply is off in this demo, no counts", async () => {
+    serve();
+    renderApp("/console/settings");
+    const slider = await screen.findByRole("slider");
+    expect(slider).toBeDisabled();
+    expect(slider).toHaveAccessibleDescription("Auto-reply is off in this demo.");
+    expect(screen.queryByRole("button", { name: /Save threshold/ })).toBeNull();
   });
 });
 
