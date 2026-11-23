@@ -1125,7 +1125,7 @@ async def _run(
         return await _run_with(settings, options, tickets, database, pipeline, limit, cache)
     finally:
         await pipeline.checkpoints.close()
-        pipeline.tracer.flush()
+        await pipeline.tracer.aflush()
 
 
 async def _run_with(

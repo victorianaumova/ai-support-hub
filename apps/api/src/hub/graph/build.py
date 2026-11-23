@@ -149,6 +149,10 @@ def guarded(spec: NodeSpec) -> "GraphNode":
                 # LangGraph's own control flow (an interrupt, P6-03), never a failure
                 step.outcome = "paused"
                 raise
+            except asyncio.CancelledError:
+                # A shutdown in the middle of the node: not `ok`; recovery runs it again.
+                step.outcome = "error"
+                raise
             except Exception as exc:
                 if isinstance(exc, TimeoutError) and spec.on_timeout is not None:
                     step.outcome = "timeout"

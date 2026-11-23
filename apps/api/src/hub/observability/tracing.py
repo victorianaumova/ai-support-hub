@@ -25,6 +25,7 @@ Langfuse gets a `TracerProvider` of its own, never the global one, so the spans 
 OpenTelemetry users in the process do not reach it.
 """
 
+import asyncio
 import hashlib
 import logging
 import uuid
@@ -288,8 +289,18 @@ class Tracer:
             logger.warning("trace observation not started", extra={"error": type(exc).__name__})
             return Observation()
 
+    async def aflush(self, timeout_s: float = 5.0) -> None:
+        """`flush` off the event loop and bounded: an unreachable host must not hold the app's
+        shutdown or the end of an evaluation run."""
+        if self.client is None:
+            return
+        try:
+            await asyncio.wait_for(asyncio.to_thread(self.flush), timeout_s)
+        except TimeoutError:
+            logger.warning("trace flush timed out")
+
     def flush(self) -> None:
-        """Send what is buffered (the end of an evaluation run, the app's shutdown)."""
+        """Send what is buffered (blocking; async callers use `aflush`)."""
         if self.client is None:
             return
         try:

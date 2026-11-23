@@ -332,6 +332,25 @@ def test_a_failing_sdk_never_breaks_a_run(fail_start: bool) -> None:
     assert ran == ["node"]
 
 
+async def test_a_node_span_that_fails_to_start_or_a_slow_flush_never_breaks_a_run() -> None:
+    broken = Tracer(client=cast(Any, _BrokenClient(fail_start=True)))
+    token = tracing._in_traced_run.set(True)
+    try:
+        with broken.observe("write") as span:
+            assert not span.recording
+    finally:
+        tracing._in_traced_run.reset(token)
+
+    class _Slow:
+        def flush(self) -> None:
+            import time
+
+            time.sleep(0.2)
+
+    await Tracer(client=cast(Any, _Slow())).aflush(timeout_s=0.01)
+    await Tracer().aflush()
+
+
 def test_a_failing_sdk_never_breaks_the_caller() -> None:
     class Broken:
         def update(self, **_fields: Any) -> None:  # noqa: ANN401

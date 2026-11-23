@@ -455,12 +455,19 @@ async def test_every_node_that_runs_is_timed_with_its_outcome() -> None:
     with pytest.raises(RuntimeError):
         await build.guarded(_spec(broken, name="act", catches=False))(_state(), runtime=runtime)
 
+    async def cancelled(state: TicketState, ctx: GraphContext) -> TicketState:
+        raise asyncio.CancelledError
+
+    with pytest.raises(asyncio.CancelledError):
+        await build.guarded(_spec(cancelled, name="respond"))(_state(), runtime=runtime)
+
     assert [(step.node, step.outcome) for step in ctx.steps] == [
         ("intake", "ok"),
         ("triage", "error"),
         ("research", "timeout"),
         ("human_review", "paused"),
         ("act", "error"),
+        ("respond", "error"),
     ]
     assert all(step.duration_ms >= 0 for step in ctx.steps)
     assert ctx.steps[2].duration_ms >= 10
