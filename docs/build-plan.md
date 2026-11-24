@@ -38,7 +38,7 @@ How the sessions, agent roles and reviews are organised: [build process](build-p
 | H2. Anthropic API key; a $5 spending limit in the Anthropic console (ADR-0018) | P3 |
 | H3. Review the knowledge-base articles | P2-08 |
 | H6. Review the attack set | P8-01 |
-| H8. Accounts: Google Cloud (billing + budget alert), Neon, Qdrant Cloud; optional Langfuse Cloud (ADR-0021; the demo runs without it); no Jira or Slack (ADR-0019) | P10-07 |
+| H8. Accounts: Google Cloud (billing + budget alert), Neon, Qdrant Cloud; optional Langfuse Cloud (ADR-0021; the demo runs without it); no Jira or Slack (ADR-0019). Done 2026-11-23 | P10-07 |
 | H9. Record the demo video; publish (make the repository public and turn on branch protection for `main`, see the README) | P12 |
 
 **Rules that never bend:** see `AGENTS.md` ("Never do").
@@ -216,7 +216,7 @@ References: [security](security.md) (all); eval plan §3 (attacks).
 
 ## Phase 9 — LLMOps (P9-01 only)
 
-Removed by [ADR-0019](adr/0019-scope-cuts.md); P9-01 restored by [ADR-0021](adr/0021-restore-run-tracing.md) (owner decision after PR #67, built before P10-07). Moved: P9-02 (metrics and settings API) → **P10-09**, because the dashboard and settings pages (P10-04) and the demo's kill switch need it; P9-06 (milestone run) → **P12-00**, because the README numbers (P12-01) need it. Not built: P9-03 (confidence threshold, experiment E9, human gate H7: auto-reply stays off in the demo), P9-04 (cost check), P9-05 (alerts, runbook, `make export-review-candidates`).
+Removed by [ADR-0019](adr/0019-scope-cuts.md); P9-01 restored by [ADR-0021](adr/0021-restore-run-tracing.md) (owner decision after PR #67, built before P10-07). Moved: P9-02 (metrics and settings API) → **P10-09**, because the dashboard and settings pages (P10-04) and the demo's kill switch need it; P9-06 (milestone run) → **P12-00**, because the README numbers (P12-01) need it. Not built: P9-03 (confidence threshold, experiment E9, human gate H7; auto-reply in the cloud demo is allowed by [ADR-0022](adr/0022-auto-reply-on-in-the-demo.md) instead), P9-04 (cost check), P9-05 (alerts, runbook, `make export-review-candidates`).
 
 References: [operations](operations.md) §3; [security](security.md) §3 (G9), §6; ADR-0014, ADR-0021.
 

@@ -69,7 +69,8 @@ export function SettingsPage() {
       <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
         <h2 className="font-semibold">Confidence threshold</h2>
         {/* UI §4 (owner decision, PR #66): the current value, read-only, and no counts; the
-            confidence threshold work was cut and auto-reply stays off in the demo (ADR-0019). */}
+            confidence threshold work was cut (ADR-0019). The note shows the real auto-reply state
+            from the settings, which the cloud demo lets a lead switch on (ADR-0022). */}
         <div className="mt-2 flex items-center gap-3">
           <label htmlFor="threshold" className="sr-only">
             Confidence threshold
@@ -80,7 +81,7 @@ export function SettingsPage() {
           </output>
         </div>
         <p id="threshold-note" className="mt-1 text-sm text-muted">
-          Auto-reply is off in this demo.
+          Auto-reply is {s.auto_reply_enabled ? "on" : "off"}. The threshold is fixed and cannot be changed here.
         </p>
       </section>
 

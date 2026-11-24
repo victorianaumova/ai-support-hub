@@ -265,5 +265,5 @@ These do not block the build. Each has a default. ADR-0018 removed the experimen
 | Is a reranker worth the extra latency? | Off; not built. | Not measured (E3 removed) |
 | Which node can use the small model without a quality loss? | Small model (Haiku) for every role. | Not measured (E8 removed) |
 | How much does the retry loop help? | One retry on. | Not measured (E7 removed) |
-| Where is the confidence threshold? | Rule score, auto-reply off by default; no trained model (ADR-0018). Auto-reply stays off in the demo (ADR-0019). | — |
+| Where is the confidence threshold? | Rule score, auto-reply off by default; no trained model (ADR-0018). The cloud demo allows it, a lead switches it on (ADR-0022, replacing that part of ADR-0019). | — |
 | Does a fine-tuned small classifier match the LLM on triage? | LLM triage. | Not measured (phase 11 removed) |

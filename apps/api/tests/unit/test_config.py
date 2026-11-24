@@ -225,3 +225,16 @@ def test_env_example_separates_app_and_migrator_users(monkeypatch: pytest.Monkey
     assert _user(settings.database_url.get_secret_value()) == "hub_api"
     assert _user(settings.eval_database_url.get_secret_value()) == "hub_api"
     assert _user(settings.database_url_direct.get_secret_value()) == "hub"
+
+
+def test_an_empty_eval_database_url_is_treated_as_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    # deploy.yml passes `EVAL_DATABASE_URL=` to Cloud Run (P10-07 review): the demo has no
+    # evaluation database, and the empty value must mean exactly that, not a broken URL.
+    monkeypatch.delenv("EVAL_DATABASE_URL", raising=False)
+    monkeypatch.delenv("EVAL_DATABASE_URL_DIRECT", raising=False)
+    unset = Settings(_env_file=None)
+    monkeypatch.setenv("EVAL_DATABASE_URL", "")
+    empty = Settings(_env_file=None)
+    assert empty.eval_database_url.get_secret_value() == ""
+    assert empty.eval_database_url == unset.eval_database_url
+    assert empty.eval_database_url_for_migrations.get_secret_value() == ""

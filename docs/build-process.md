@@ -81,7 +81,7 @@ flowchart LR
 3. Write three lines into the dev log: what was built, what surprised you, what you do not understand yet.
 4. Only then tell the builder to start the next phase.
 
-**Human gates** cannot be given to an agent. The biggest one: reviewing the attack set (H6). H7 (auto-reply in the demo) was removed with phase 9 by ADR-0019: auto-reply stays off. H4 and H5 (checking every evaluation ticket, labelling answers for the judge) were removed by ADR-0018.
+**Human gates** cannot be given to an agent. The biggest one: reviewing the attack set (H6). H7 (auto-reply in the demo) was removed with phase 9 by ADR-0019; the owner allowed auto-reply in the cloud demo without it ([ADR-0022](adr/0022-auto-reply-on-in-the-demo.md)). H4 and H5 (checking every evaluation ticket, labelling answers for the judge) were removed by ADR-0018.
 
 ## 6. Working in parallel
 
