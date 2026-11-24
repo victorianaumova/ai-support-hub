@@ -38,7 +38,9 @@ from hub.api.console_schemas import (
     MemoryOut,
     ModelCallOut,
     QueueTicketOut,
+    RelatedTicketOut,
     ReplyIn,
+    ReviewOut,
     RunOut,
     TicketVersionIn,
     ToolCallOut,
@@ -55,7 +57,7 @@ from hub.api.resume import (
 from hub.api.schemas import Page
 from hub.audit import record
 from hub.auth.roles import OPERATOR, TICKET_READER, can_override_claim
-from hub.db.models import Message, Operator, Ticket
+from hub.db.models import Draft, Message, Operator, Run, Ticket
 from hub.db.repositories import (
     ConcurrentUpdateError,
     DraftRepository,
@@ -80,9 +82,17 @@ from hub.domain.enums import (
     TicketStatus,
     Urgency,
 )
-from hub.domain.memory import MEMORY_ITEMS
+from hub.domain.memory import (
+    MEMORY_ITEMS,
+    OPEN_TICKETS,
+    CustomerContext,
+    MemoryItem,
+    OpenTicket,
+    repeat_contacts,
+)
 from hub.domain.review import ReviewDecision
 from hub.guardrails.masking import mask
+from hub.guardrails.policy import Policy, review_rules
 from hub.observability.tracing import trace_url
 
 router = APIRouter(prefix="/api/v1/console", tags=["console"])
@@ -241,6 +251,68 @@ async def _row(session: AsyncSession, ticket_id: uuid.UUID) -> QueueTicketOut:
     return _row_out(row)
 
 
+# Memory items read for the repeat check of `_review`: more than intake's 5, because items
+# written after the run are dropped before the 5 newest are taken.
+_REVIEW_MEMORY_ITEMS = 20
+
+
+async def _review(
+    session: AsyncSession, policy: Policy, ticket: Ticket, run: Run | None, draft: Draft | None
+) -> ReviewOut | None:
+    """Which `approval_only` rules sent the latest run's draft to approval (ReviewOut). The
+    customer's tickets are taken as the run saw them: open tickets created before it started,
+    memory items written before it started (intake reads both at the run's start)."""
+    if run is None or [str(reason) for reason in ticket.route_reasons] != [
+        RouteReason.POLICY_REVIEW.value
+    ]:
+        return None
+    memory = MemoryRepository(session)
+    started = run.started_at
+    others = await memory.open_tickets(
+        ticket.customer_id, exclude=ticket.id, limit=OPEN_TICKETS, created_before=started
+    )
+    items = [
+        (item, intent)
+        for item, intent in await memory.active_for_customer(
+            ticket.customer_id, limit=_REVIEW_MEMORY_ITEMS, exclude_ticket=ticket.id
+        )
+        if item.created_at < started
+    ][:MEMORY_ITEMS]
+    context = CustomerContext(
+        memory=[
+            MemoryItem(
+                ticket_id=str(item.ticket_id),
+                intent=intent,
+                summary=item.content,
+                created_at=item.created_at,
+            )
+            for item, intent in items
+        ],
+        open_tickets=[
+            OpenTicket(ticket_id=str(other.id), intent=other.intent, status=other.status)
+            for other in others
+        ],
+    )
+    repeat_ids = repeat_contacts(context, ticket.intent, started)
+    tickets = TicketRepository(session)
+    repeat_of = [
+        RelatedTicketOut(
+            id=found.id, intent=found.intent, status=found.status, created_at=found.created_at
+        )
+        for found in [await tickets.get(uuid.UUID(ticket_id)) for ticket_id in repeat_ids]
+        if found is not None
+    ]
+    rules = review_rules(
+        policy,
+        intent=ticket.intent,
+        asks_for_action=None,  # not stored (ReviewOut)
+        high_urgency=ticket.urgency == Urgency.HIGH,
+        has_proposed_actions=draft is not None and bool(draft.proposed_actions),
+        memory_shows_open_case=bool(repeat_ids),
+    )
+    return ReviewOut(rules=rules, repeat_of=repeat_of)
+
+
 # --- endpoints ------------------------------------------------------------------------------
 
 
@@ -323,6 +395,9 @@ async def get_ticket(
             container.settings.langfuse_project_id,
             run.trace_id,
         ),
+        review=None
+        if container.pipeline is None
+        else await _review(session, container.pipeline.policy, ticket, run, draft),
     )
 
 

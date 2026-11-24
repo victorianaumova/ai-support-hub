@@ -7,6 +7,7 @@
 - `shows_open_case`: the `memory_shows_open_case` condition of `approval_only`
   (ai-pipeline §6): another open ticket with the same intent, or a memory item of the last 14
   days on the same intent. A repeated contact means the first answer did not help.
+  `repeat_contacts` lists those tickets for the console.
 
 - `profile`: tier, country and the restricted flag, loaded by intake with `core_get_customer`
   (P7-04); None when the tool failed or the run has no tool client.
@@ -67,10 +68,21 @@ class CustomerContext(BaseModel):
 def shows_open_case(context: CustomerContext | None, intent: Intent | str, now: datetime) -> bool:
     """`memory_shows_open_case`: the same intent as another open ticket, or as a memory item of
     the last 14 days."""
-    if context is None:
-        return False
-    if any(ticket.intent == intent for ticket in context.open_tickets):
-        return True
-    return any(
-        item.intent == intent and now - item.created_at <= REPEAT_WINDOW for item in context.memory
-    )
+    return bool(repeat_contacts(context, intent, now))
+
+
+def repeat_contacts(
+    context: CustomerContext | None, intent: Intent | str | None, now: datetime
+) -> list[str]:
+    """The tickets that make this a repeated contact (`memory_shows_open_case`): other open
+    tickets with the same intent, then the tickets of memory items of the last 14 days on it,
+    without repeats. The console links them under "Why you see this ticket"."""
+    if context is None or intent is None:
+        return []
+    found = [ticket.ticket_id for ticket in context.open_tickets if ticket.intent == intent]
+    found += [
+        item.ticket_id
+        for item in context.memory
+        if item.intent == intent and now - item.created_at <= REPEAT_WINDOW
+    ]
+    return list(dict.fromkeys(found))

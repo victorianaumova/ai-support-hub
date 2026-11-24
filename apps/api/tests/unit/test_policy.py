@@ -29,6 +29,7 @@ from hub.guardrails.policy import (
     next_opening,
     reasons,
     response_time,
+    review_rules,
     safe_first_steps,
 )
 
@@ -278,6 +279,34 @@ def test_each_approval_only_rule_needs_review(
 
 def test_a_routine_draft_needs_no_review() -> None:
     assert not needs_review(POLICY, _triage(), has_proposed_actions=False)
+
+
+def test_review_rules_name_every_approval_only_rule_that_matched_in_file_order() -> None:
+    """P12: the console shows which row-6 rule sent the draft to approval."""
+    assert review_rules(
+        POLICY,
+        intent="dispute_chargeback",
+        asks_for_action="dispute",
+        high_urgency=True,
+        has_proposed_actions=True,
+        memory_shows_open_case=True,
+    ) == ["intent", "action", "high_urgency", "has_proposed_actions", "memory_shows_open_case"]
+    assert review_rules(
+        POLICY,
+        intent="withdrawal_issue",
+        asks_for_action=None,
+        high_urgency=False,
+        has_proposed_actions=False,
+        memory_shows_open_case=True,
+    ) == ["memory_shows_open_case"]
+    assert not review_rules(
+        POLICY,
+        intent=None,
+        asks_for_action="none",
+        high_urgency=False,
+        has_proposed_actions=False,
+        memory_shows_open_case=False,
+    )
 
 
 def test_the_intent_setting_can_remove_intents_but_never_add_them() -> None:

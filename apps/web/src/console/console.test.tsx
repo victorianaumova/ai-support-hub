@@ -297,6 +297,20 @@ describe("ticket workspace", () => {
     expect(within(panel).getByRole("link", { name: "Fees" })).toHaveAttribute("href", "/help/fees#fees");
   });
 
+  it("says which approval rule matched and links the ticket a repeat contact repeats", async () => {
+    const review = {
+      rules: ["high_urgency", "memory_shows_open_case"],
+      repeat_of: [{ id: "t0", intent: "withdrawal_issue", status: "answered", created_at: ROW.created_at }],
+    };
+    serve({ "GET /api/v1/console/tickets/t1": () => new Response(JSON.stringify({ ...TICKET, route_reasons: ["policy_review"], review })) });
+    renderApp("/console/tickets/t1");
+    const why = (await screen.findByRole("heading", { name: "Why you see this ticket" })).closest("section") as HTMLElement;
+    expect(within(why).getByText("Policy: drafts of this kind are reviewed")).toBeInTheDocument();
+    expect(within(why).getByText("High urgency")).toBeInTheDocument();
+    expect(within(why).getByText("Repeat contact: the customer wrote about this before")).toBeInTheDocument();
+    expect(within(why).getByRole("link", { name: /withdrawal issue · answered/ })).toHaveAttribute("href", "/console/tickets/t0");
+  });
+
   it("the Run tab lists the recorded model calls with their latency", async () => {
     const call = { id: "l1", node: "triage", model: "gpt-x", prompt_version: "triage/v1", status: "ok", latency_ms: 812, cost_usd: "0.000400", input_tokens: 500, output_tokens: 50, created_at: ROW.created_at };
     serve({ "GET /api/v1/console/tickets/t1": () => new Response(JSON.stringify({ ...TICKET, model_calls: [call] })) });

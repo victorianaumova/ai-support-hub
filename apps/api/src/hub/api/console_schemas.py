@@ -29,6 +29,7 @@ from hub.domain.enums import (
     ToolNode,
     Urgency,
 )
+from hub.guardrails.policy import ReviewRule
 
 
 class _Strict(BaseModel):
@@ -254,6 +255,29 @@ class MemoryOut(BaseModel):
     expires_at: datetime
 
 
+class RelatedTicketOut(BaseModel):
+    """Another ticket of the same customer, linked from "Why you see this ticket"."""
+
+    id: uuid.UUID
+    intent: Intent | None
+    status: TicketStatus
+    created_at: datetime
+
+
+class ReviewOut(BaseModel):
+    """Why row 6 (`approval_only`, route reason `policy_review`) sent the draft to approval
+    (ui.md §3). Worked out when the ticket is read, with the same policy function as `decide`:
+    `intent` and `high_urgency` from the ticket's triage, `has_proposed_actions` from the
+    latest draft, `memory_shows_open_case` from the customer's tickets as they were when the
+    latest run started. `action` (the customer asks for a dispute) is not stored and never
+    listed; an empty `rules` list means only that."""
+
+    rules: list[ReviewRule]
+    # The tickets that make this a repeated contact (`memory_shows_open_case`): other open
+    # tickets with the same intent, then tickets of memory items of the 14 days before the run.
+    repeat_of: list[RelatedTicketOut]
+
+
 class ToolCallOut(BaseModel):
     """One tool call of the ticket's runs (data model, `tool_calls`; P7-05): arguments and
     summary are stored masked; `external_ref` is the Jira key or the Slack message `ts`."""
@@ -316,6 +340,8 @@ class ConsoleTicketOut(QueueTicketOut):
     # The model call attempts of the latest run, oldest first (P10-03 review).
     model_calls: list[ModelCallOut] = Field(default_factory=list)
     trace_url: str | None = None
+    # Only for a ticket whose route reason is `policy_review` (P12, ui.md §3).
+    review: ReviewOut | None = None
 
 
 # --- account view (P10-03 review) -------------------------------------------------------------

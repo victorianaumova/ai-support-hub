@@ -924,6 +924,7 @@ export interface components {
             resolution: string | null;
             /** Resolved At */
             resolved_at: string | null;
+            review?: components["schemas"]["ReviewOut"] | null;
             /** Route Reasons */
             route_reasons: string[];
             status: components["schemas"]["TicketStatus"];
@@ -1559,12 +1560,45 @@ export interface components {
          * @enum {string}
          */
         RejectReason: "wrong_facts" | "wrong_tone" | "missing_info" | "policy" | "other";
+        /**
+         * RelatedTicketOut
+         * @description Another ticket of the same customer, linked from "Why you see this ticket".
+         */
+        RelatedTicketOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            intent: components["schemas"]["Intent"] | null;
+            status: components["schemas"]["TicketStatus"];
+        };
         /** ReplyIn */
         ReplyIn: {
             /** Body */
             body: string;
             /** Ticket Version */
             ticket_version: number;
+        };
+        /**
+         * ReviewOut
+         * @description Why row 6 (`approval_only`, route reason `policy_review`) sent the draft to approval
+         *     (ui.md §3). Worked out when the ticket is read, with the same policy function as `decide`:
+         *     `intent` and `high_urgency` from the ticket's triage, `has_proposed_actions` from the
+         *     latest draft, `memory_shows_open_case` from the customer's tickets as they were when the
+         *     latest run started. `action` (the customer asks for a dispute) is not stored and never
+         *     listed; an empty `rules` list means only that.
+         */
+        ReviewOut: {
+            /** Repeat Of */
+            repeat_of: components["schemas"]["RelatedTicketOut"][];
+            /** Rules */
+            rules: ("intent" | "action" | "high_urgency" | "has_proposed_actions" | "memory_shows_open_case")[];
         };
         /**
          * Route

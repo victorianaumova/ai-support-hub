@@ -6,7 +6,8 @@ Pure functions over the loaded file:
   (policy topic first, so `policy_intent` wins over `restricted_account`; owner decision, P4-02
   review). The first code decides; the safe first steps and the urgency of the handoff notice
   come from all of them (owner decision, P6-02).
-- `needs_review`: row 6 (`approval_only`); `auto_reply_intents`: row 7's allow-list.
+- `needs_review`: row 6 (`approval_only`), with `review_rules` naming the rules that matched;
+  `auto_reply_intents`: row 7's allow-list.
 - `handoff_notice`: the fixed customer text of a handoff (ai-pipeline §3, FR-11): the opening of
   the first reason, the safe first steps, and the expected response time from `support_hours`.
 
@@ -291,17 +292,47 @@ def needs_review(
     memory_shows_open_case: bool = False,
 ) -> bool:
     """Row 6 (`approval_only`): the AI may draft, a human must send."""
+    return bool(
+        review_rules(
+            policy,
+            intent=triage.intent,
+            asks_for_action=triage.asks_for_action,
+            high_urgency=triage.urgency == "high",
+            has_proposed_actions=has_proposed_actions,
+            memory_shows_open_case=memory_shows_open_case,
+        )
+    )
+
+
+ReviewRule = Literal[
+    "intent", "action", "high_urgency", "has_proposed_actions", "memory_shows_open_case"
+]
+
+
+def review_rules(
+    policy: Policy,
+    *,
+    intent: str | None,
+    asks_for_action: str | None,
+    high_urgency: bool,
+    has_proposed_actions: bool,
+    memory_shows_open_case: bool,
+) -> list[ReviewRule]:
+    """Which rules of row 6 (`approval_only`) match, in the order of the file: `intent`,
+    `action`, then each condition. The console shows them under "Why you see this ticket"."""
     rules = policy.approval_only
-    found = {
-        "high_urgency": triage.urgency == "high",
+    found: dict[ReviewCondition, bool] = {
+        "high_urgency": high_urgency,
         "has_proposed_actions": has_proposed_actions,
         "memory_shows_open_case": memory_shows_open_case,
     }
-    return (
-        triage.intent in rules.intents
-        or triage.asks_for_action in rules.actions
-        or any(found[name] for name in rules.conditions)
-    )
+    matched: list[ReviewRule] = []
+    if intent is not None and intent in rules.intents:
+        matched.append("intent")
+    if asks_for_action is not None and asks_for_action in rules.actions:
+        matched.append("action")
+    matched += [name for name in rules.conditions if found[name]]
+    return matched
 
 
 def auto_reply_intents(policy: Policy, setting: object) -> frozenset[str]:

@@ -22,6 +22,20 @@ export const REASONS: Record<string, string> = {
   operator_takeover: "An operator took over during the run",
 };
 
+/** The `approval_only` rule that sent a draft to approval (`review.rules`, ai-pipeline §6;
+ * P12): shown under "Why you see this ticket" with the `policy_review` reason. */
+export const REVIEW_RULES: Record<string, string> = {
+  intent: "This topic is always reviewed",
+  action: "The customer asks for a dispute",
+  high_urgency: "High urgency",
+  has_proposed_actions: "The draft proposes an action",
+  memory_shows_open_case: "Repeat contact: the customer wrote about this before",
+};
+
+export function reviewRuleText(rule: string): string {
+  return REVIEW_RULES[rule] ?? rule;
+}
+
 export function reasonText(code: string, confidence?: string | number | null): string {
   const text = REASONS[code] ?? code;
   if (code === "low_confidence" && confidence !== null && confidence !== undefined) {

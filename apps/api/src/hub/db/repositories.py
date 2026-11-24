@@ -579,17 +579,23 @@ class MemoryRepository:
         return [(memory, intent) for memory, intent in result.all()]
 
     async def open_tickets(
-        self, customer_id: uuid.UUID, *, exclude: uuid.UUID, limit: int
+        self,
+        customer_id: uuid.UUID,
+        *,
+        exclude: uuid.UUID,
+        limit: int,
+        created_before: datetime | None = None,
     ) -> Sequence[Ticket]:
-        """The customer's tickets that are not closed, other than `exclude`, newest first."""
+        """The customer's tickets that are not closed, other than `exclude`, newest first;
+        with `created_before`, only tickets created before that time."""
+        conditions = [
+            Ticket.customer_id == customer_id,
+            Ticket.id != exclude,
+            Ticket.status != TicketStatus.CLOSED,
+        ]
+        if created_before is not None:
+            conditions.append(Ticket.created_at < created_before)
         result = await self._session.execute(
-            select(Ticket)
-            .where(
-                Ticket.customer_id == customer_id,
-                Ticket.id != exclude,
-                Ticket.status != TicketStatus.CLOSED,
-            )
-            .order_by(Ticket.id.desc())
-            .limit(limit)
+            select(Ticket).where(*conditions).order_by(Ticket.id.desc()).limit(limit)
         )
         return result.scalars().all()
