@@ -85,21 +85,21 @@ export function DraftEditor({
   }, []);
 
   return (
-    <section aria-labelledby="draft-heading" className="rounded-lg border border-slate-200 bg-white p-4">
+    <section aria-labelledby="draft-heading" className="panel p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="draft-heading" className="text-lg font-semibold">
+        <h2 id="draft-heading" className="text-base font-medium">
           AI draft
         </h2>
-        <p className="text-sm text-muted">
+        <p className="text-muted">
           Groundedness {draft.groundedness ?? "—"} · status {draft.status}
         </p>
       </div>
       {!draft.can_answer && (
-        <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-950">
+        <p className="mt-2 rounded bg-amber-50 p-2 text-amber-950">
           The AI could not answer from the sources. {draft.missing_information ?? ""} Edit it into an answer, or reject it.
         </p>
       )}
-      <label htmlFor="draft-text" className="mt-3 block text-sm font-medium">
+      <label htmlFor="draft-text" className="mt-3 block font-medium">
         Answer to the customer {pending ? "(E to edit)" : ""}
       </label>
       <textarea
@@ -112,15 +112,15 @@ export function DraftEditor({
         onChange={(event) => {
           setText(event.target.value);
         }}
-        className="mt-1 w-full rounded-md border border-slate-300 p-2 font-sans"
+        className="field mt-1 w-full p-2 font-sans leading-relaxed"
       />
       {unknown.length > 0 && (
-        <p role="alert" className="mt-1 text-sm text-red-800">
+        <p role="alert" className="mt-1 text-red-800">
           No source for marker {unknown.map((n) => `[${n}]`).join(", ")}. Remove it or keep only the cited markers.
         </p>
       )}
-      <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm" aria-label="Preview with citations">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Preview</p>
+      <div className="mt-3 rounded-md border border-line bg-surface p-3" aria-label="Preview with citations">
+        <p className="mb-1 text-xs font-medium text-muted">Preview</p>
         <SafeText
           text={text}
           highlights={parts.claims}
@@ -133,7 +133,7 @@ export function DraftEditor({
                 onCite(marker);
               }}
               aria-label={`Source ${marker}`}
-              className="mx-0.5 inline-flex items-center rounded-full bg-brand-50 px-1.5 text-xs font-semibold text-brand-700 ring-1 ring-brand-600"
+              className="mx-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-weak px-1.5 text-xs font-medium text-[var(--tb-primary-strong)] hover:bg-sky-300"
             >
               {marker}
             </button>
@@ -141,7 +141,7 @@ export function DraftEditor({
         />
       </div>
       {parts.claims.length > 0 && (
-        <div className="mt-2 text-sm">
+        <div className="mt-2">
           <p className="font-medium text-red-900">Claims without support (underlined):</p>
           <ul className="list-disc pl-5">
             {parts.claims.map((claim) => <li key={claim}>{claim}</li>)}
@@ -150,8 +150,8 @@ export function DraftEditor({
       )}
 
       {parts.actions.length > 0 && (
-        <fieldset className="mt-4 rounded-md border border-slate-200 p-3">
-          <legend className="px-1 text-sm font-semibold">Proposed actions</legend>
+        <fieldset className="mt-4 rounded-md border border-line p-3">
+          <legend className="px-1 font-medium">Proposed actions</legend>
           {parts.actions.map((action) => (
             <div key={action.id} className="text-sm">
               <label className="flex items-start gap-2">
@@ -181,7 +181,7 @@ export function DraftEditor({
             disabled={!canApprove}
             title={edited ? "You changed the text: use Send edited" : "A"}
             onClick={approve}
-            className="rounded-md bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+            className="btn btn-primary"
           >
             Approve and send
           </button>
@@ -191,7 +191,7 @@ export function DraftEditor({
             onClick={() => {
               actions.edit(text, ticked);
             }}
-            className="rounded-md border border-brand-600 bg-white px-4 py-2 font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+            className="btn btn-secondary"
           >
             Send edited
           </button>
@@ -202,7 +202,7 @@ export function DraftEditor({
               setRejectOpen(!rejectOpen);
             }}
             aria-expanded={rejectOpen}
-            className="rounded-md border border-red-400 bg-white px-4 py-2 font-medium text-red-800 hover:bg-red-50"
+            className="btn btn-danger"
           >
             Reject
           </button>
@@ -216,7 +216,7 @@ export function DraftEditor({
             if (reason !== "") actions.reject(reason, note, reply);
           }}
         >
-          <label className="block text-sm font-medium">
+          <label className="block font-medium">
             Reason (required)
             <select
               required
@@ -224,26 +224,26 @@ export function DraftEditor({
               onChange={(event) => {
                 setReason(event.target.value as RejectReason);
               }}
-              className="ml-2 rounded border border-slate-300 px-2 py-1"
+              className="field ml-2"
             >
               <option value="">Choose…</option>
               {REJECT_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
           </label>
-          <label className="block text-sm">
+          <label className="block">
             Note for the team (optional)
-            <input maxLength={1000} value={note} onChange={(event) => { setNote(event.target.value); }} className="mt-1 w-full rounded border border-slate-300 px-2 py-1" />
+            <input maxLength={1000} value={note} onChange={(event) => { setNote(event.target.value); }} className="field mt-1 w-full py-1" />
           </label>
-          <label className="block text-sm">
+          <label className="block">
             Your own reply to the customer (optional; without it the ticket waits in the queue)
-            <textarea maxLength={4000} rows={3} value={reply} onChange={(event) => { setReply(event.target.value); }} className="mt-1 w-full rounded border border-slate-300 px-2 py-1" />
+            <textarea maxLength={4000} rows={3} value={reply} onChange={(event) => { setReply(event.target.value); }} className="field mt-1 w-full py-1" />
           </label>
-          <button type="submit" disabled={reason === "" || actions.busy} className="rounded-md bg-red-700 px-4 py-2 font-medium text-white disabled:opacity-50">
+          <button type="submit" disabled={reason === "" || actions.busy} className="btn bg-red-700 text-white disabled:bg-surface-hover disabled:text-muted">
             Reject draft
           </button>
         </form>
       )}
-      {!pending && draft.final_body !== null && <p className="mt-3 text-sm text-muted">Sent text: {draft.final_body}</p>}
+      {!pending && draft.final_body !== null && <p className="mt-3 text-muted">Sent text: {draft.final_body}</p>}
     </section>
   );
 }

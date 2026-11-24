@@ -48,9 +48,9 @@ export function Dialog({ title, onClose, children }: { title: string; onClose: (
   }, []);
 
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-slate-900/40 p-4">
-      <div ref={box} role="dialog" aria-modal="true" aria-labelledby="dialog-title" className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-5 shadow-xl">
-        <h2 id="dialog-title" className="text-lg font-semibold">
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-900/40 p-4">
+      <div ref={box} role="dialog" aria-modal="true" aria-labelledby="dialog-title" className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-lg border border-line bg-white p-6 shadow-[0_4px_16px_rgb(60_64_67/0.15)]">
+        <h2 id="dialog-title" className="text-lg font-medium">
           {title}
         </h2>
         <div className="mt-3">{children}</div>

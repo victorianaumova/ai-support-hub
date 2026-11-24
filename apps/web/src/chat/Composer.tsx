@@ -1,4 +1,5 @@
 import { type KeyboardEvent, useState } from "react";
+import { Icon } from "../components/Icon";
 
 export const MAX_CHARS = 4000;
 export const COUNTER_FROM = 3500;
@@ -20,7 +21,7 @@ export function Composer({ disabled, onSend }: { disabled: boolean; onSend: (tex
   };
   return (
     <form
-      className="border-t border-slate-200 bg-white p-3"
+      className="border-t border-line bg-white p-4"
       onSubmit={(event) => {
         event.preventDefault();
         send();
@@ -42,13 +43,14 @@ export function Composer({ disabled, onSend }: { disabled: boolean; onSend: (tex
           }}
           onKeyDown={keyDown}
           aria-describedby="message-help"
-          className="min-h-[3rem] flex-1 resize-y rounded-md border border-slate-300 px-3 py-2 disabled:bg-slate-50"
+          className="field min-h-[3rem] flex-1 resize-y rounded-lg px-3 py-2 disabled:bg-surface"
         />
         <button
           type="submit"
           disabled={disabled || trimmed === ""}
-          className="rounded-md bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="btn btn-primary"
         >
+          <Icon name="send" size={18} />
           Send
         </button>
       </div>

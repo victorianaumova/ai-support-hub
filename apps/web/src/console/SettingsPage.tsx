@@ -46,11 +46,11 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6">
-      <h1 className="text-2xl font-semibold">Settings</h1>
+    <div className="max-w-3xl px-4 py-5 sm:px-8 md:py-8 lg:px-10">
+      <h1 className="flex h-12 items-center page-title">Settings</h1>
       <p className="mt-1 text-sm text-muted">Changes count from the next ticket. Each change is written to the audit log with your reason.</p>
 
-      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+      <section className="mt-6 panel p-4">
         <h2 className="font-semibold">Auto-reply</h2>
         <p className="mt-1 text-sm">
           Now: <strong>{s.auto_reply_enabled ? "on" : "off"}</strong>. When off, every draft waits for an operator's approval.
@@ -60,13 +60,13 @@ export function SettingsPage() {
           role="switch"
           aria-checked={s.auto_reply_enabled}
           onClick={() => { ask({ auto_reply_enabled: !s.auto_reply_enabled }); }}
-          className={`mt-3 rounded-md px-4 py-2 font-medium ${s.auto_reply_enabled ? "bg-red-700 text-white" : "bg-brand-600 text-white"}`}
+          className={`btn mt-3 text-white ${s.auto_reply_enabled ? "bg-red-700" : "btn-primary"}`}
         >
           {s.auto_reply_enabled ? "Switch auto-reply off" : "Switch auto-reply on…"}
         </button>
       </section>
 
-      <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+      <section className="mt-4 panel p-4">
         <h2 className="font-semibold">Confidence threshold</h2>
         {/* UI §4 (owner decision, PR #66): the current value, read-only, and no counts; the
             confidence threshold work was cut (ADR-0019). The note shows the real auto-reply state
@@ -85,7 +85,7 @@ export function SettingsPage() {
         </p>
       </section>
 
-      <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+      <section className="mt-4 panel p-4">
         <h2 className="font-semibold">Daily model budget</h2>
         <form
           className="mt-2 flex flex-wrap items-end gap-2"
@@ -97,15 +97,15 @@ export function SettingsPage() {
         >
           <label className="text-sm">
             USD per day (now {s.daily_budget_usd === null ? "not set" : `$${s.daily_budget_usd.toFixed(2)}`})
-            <input type="number" min={0} max={100} step={0.01} value={budget} onChange={(e) => { setBudget(e.target.value); }} className="ml-2 w-28 rounded border border-slate-300 px-2 py-1" />
+            <input type="number" min={0} max={100} step={0.01} value={budget} onChange={(e) => { setBudget(e.target.value); }} className="ml-2 w-28 field" />
           </label>
-          <button type="submit" disabled={budget === ""} className="rounded-md border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-50">
+          <button type="submit" disabled={budget === ""} className="btn btn-secondary">
             Save budget…
           </button>
         </form>
       </section>
 
-      <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+      <section className="mt-4 panel p-4">
         <h2 className="font-semibold">Intents that may be auto-replied</h2>
         <p className="mt-1 text-xs text-muted">Only intents the policy allows can be listed; the others always need a human.</p>
         <fieldset className="mt-2 grid gap-1 sm:grid-cols-2">
@@ -145,17 +145,17 @@ export function SettingsPage() {
             <label htmlFor="reason" className="block text-sm font-medium">
               Reason (required, goes to the audit log)
             </label>
-            <textarea id="reason" required minLength={3} maxLength={500} rows={2} value={reason} onChange={(e) => { setReason(e.target.value); }} className="mt-1 w-full rounded-md border border-slate-300 p-2" />
+            <textarea id="reason" required minLength={3} maxLength={500} rows={2} value={reason} onChange={(e) => { setReason(e.target.value); }} className="mt-1 w-full field p-2" />
             {save.isError && (
               <p role="alert" className="mt-2 text-sm text-red-900">
                 {save.error instanceof ApiError && save.error.code === "validation_error" ? "The change was refused: check the value." : describe(save.error)}
               </p>
             )}
             <div className="mt-3 flex justify-end gap-2">
-              <button type="button" onClick={() => { setPending(null); }} className="rounded-md border border-slate-300 px-3 py-1.5">
+              <button type="button" onClick={() => { setPending(null); }} className="btn btn-secondary">
                 Cancel
               </button>
-              <button type="submit" disabled={reason.trim().length < 3 || save.isPending} className="rounded-md bg-brand-600 px-4 py-1.5 font-medium text-white disabled:opacity-50">
+              <button type="submit" disabled={reason.trim().length < 3 || save.isPending} className="btn btn-primary">
                 Confirm change
               </button>
             </div>

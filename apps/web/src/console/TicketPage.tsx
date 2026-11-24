@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { ApiError, describe } from "../api/problem";
 import { useOperator } from "../auth/session";
 import { ErrorState } from "../components/ErrorState";
+import { Icon } from "../components/Icon";
 import { Loading } from "../components/Loading";
 import { SafeText } from "../text/SafeText";
 import { ContextTabs } from "./ContextTabs";
@@ -25,12 +26,12 @@ function actionError(error: unknown): string {
 
 function Conversation({ ticket }: { ticket: Ticket }) {
   return (
-    <section aria-label="Conversation" className="rounded-lg border border-slate-200 bg-white p-3">
-      <h2 className="mb-2 font-semibold">Conversation</h2>
+    <section aria-label="Conversation" className="panel self-start p-4">
+      <h2 className="mb-3 text-base font-medium">Conversation</h2>
       <ol className="space-y-3">
         {ticket.messages.map((m) => (
-          <li key={m.id} className={`rounded-md p-2 text-sm ${m.role === "customer" ? "bg-slate-100" : m.role === "system" ? "border border-sky-300 bg-sky-50" : "border border-slate-200"}`}>
-            <p className="text-xs text-muted">
+          <li key={m.id} className={`rounded-lg p-3 ${m.role === "customer" ? "bg-surface-hover" : m.role === "system" ? "border border-sky-300 bg-sky-50" : "border border-line"}`}>
+            <p className="mb-1 text-xs text-muted">
               {m.role === "customer" ? ticket.customer.display_name : m.author_label} ·{" "}
               {new Date(m.created_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}
             </p>
@@ -88,67 +89,75 @@ export function TicketPage() {
   );
 
   return (
-    <div className="mx-auto max-w-[96rem] px-4 py-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold">
+    <div className="px-4 py-5 sm:px-8 md:py-8 lg:px-10">
+      <div className="flex min-h-12 flex-wrap items-center gap-3">
+        <Link to="/console" aria-label="Back to the queue" className="btn-icon -ml-2">
+          <Icon name="arrow_back" />
+        </Link>
+        <h1 className="page-title">
           {data.customer.display_name} · {words(data.intent)}
         </h1>
-        <span className="rounded bg-slate-100 px-2 py-0.5 text-sm">{words(data.status)}</span>
-        {isUrgent(data) && <span className="rounded bg-red-100 px-2 py-0.5 text-sm font-semibold text-red-900">⚑ Urgent</span>}
-        <span className="text-sm text-muted">{data.assigned_operator ? `Claimed by ${data.assigned_operator.name}` : "Not claimed"}</span>
+        <span className="chip chip-info capitalize">{words(data.status)}</span>
+        {isUrgent(data) && (
+          <span className="chip chip-danger">
+            <Icon name="flag" size={14} />
+            Urgent
+          </span>
+        )}
+        <span className="text-muted">{data.assigned_operator ? `Claimed by ${data.assigned_operator.name}` : "Not claimed"}</span>
         <div className="ml-auto flex flex-wrap gap-2">
           {data.status !== "closed" && !mine && (
-            <button type="button" disabled={busy} onClick={() => { t.claim.mutate(); }} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm">
+            <button type="button" disabled={busy} onClick={() => { t.claim.mutate(); }} className="btn btn-secondary">
               Claim
             </button>
           )}
           {mine && (
-            <button type="button" disabled={busy} onClick={() => { t.release.mutate(); }} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm">
+            <button type="button" disabled={busy} onClick={() => { t.release.mutate(); }} className="btn btn-secondary">
               Release
             </button>
           )}
           {canReply && (
-            <button type="button" disabled={busy} onClick={() => { t.close.mutate(); }} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm">
+            <button type="button" disabled={busy} onClick={() => { t.close.mutate(); }} className="btn btn-secondary">
               Close ticket
             </button>
           )}
         </div>
       </div>
-      <p className="mt-1 text-xs text-muted">Shortcuts: A approve · E edit · R reject · J / K next / previous ticket</p>
+      <p className="mt-1 pl-10 text-xs text-muted">Shortcuts: A approve · E edit · R reject · J / K next / previous ticket</p>
 
       {t.stale && (
-        <div role="alert" className="mt-3 flex items-center justify-between rounded-md border border-amber-400 bg-amber-50 p-3 text-amber-950">
+        <div role="alert" className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-amber-400 bg-amber-50 p-3 text-amber-950">
           <span>
             <strong>The customer wrote again.</strong> The ticket was reloaded; check the new message and the new draft.
           </span>
-          <button type="button" onClick={t.dismissStale} className="text-sm underline">
+          <button type="button" onClick={t.dismissStale} className="btn btn-secondary">
             Dismiss
           </button>
         </div>
       )}
       {lastError !== undefined && (
-        <p role="alert" className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-900">
+        <p role="alert" className="mt-4 rounded-lg border border-red-300 bg-red-50 p-3 text-red-900">
           {actionError(lastError)}
         </p>
       )}
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
+      <div className="mt-4 grid gap-4 border-t border-line pt-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
         <Conversation ticket={data} />
         <div className="space-y-4">
-          <section aria-labelledby="why-heading" className="rounded-lg border border-slate-200 bg-white p-4">
-            <h2 id="why-heading" className="font-semibold">
+          <section aria-labelledby="why-heading" className="panel p-4">
+            <h2 id="why-heading" className="text-base font-medium">
               Why you see this ticket
             </h2>
-            <p className="mt-1 text-sm">Route: {words(data.last_route)}{data.confidence !== null ? ` · confidence ${Number(data.confidence).toFixed(2)}` : ""}</p>
+            <p className="mt-1">Route: {words(data.last_route)}{data.confidence !== null ? ` · confidence ${Number(data.confidence).toFixed(2)}` : ""}</p>
             <ul className="mt-2 flex flex-wrap gap-1">
               {data.route_reasons.map((code) => (
-                <li key={code} className="rounded bg-slate-100 px-2 py-0.5 text-sm">
+                <li key={code} className="chip chip-info whitespace-normal py-1">
                   {reasonText(code, data.confidence)}
                 </li>
               ))}
             </ul>
             {data.review && (
-              <div className="mt-2 text-sm">
+              <div className="mt-3">
                 <p className="font-medium">Reviewed because</p>
                 {data.review.rules.length === 0 ? (
                   <p className="text-muted">The matching rule is not recorded for this ticket.</p>
@@ -165,7 +174,7 @@ export function TicketPage() {
                     <ul className="list-disc pl-5">
                       {data.review.repeat_of.map((other) => (
                         <li key={other.id}>
-                          <Link to={`/console/tickets/${other.id}`} className="text-brand-700 underline">
+                          <Link to={`/console/tickets/${other.id}`} className="text-primary-text hover:underline">
                             {words(other.intent)} · {words(other.status)} · {new Date(other.created_at).toLocaleDateString()}
                           </Link>
                         </li>
@@ -176,7 +185,7 @@ export function TicketPage() {
               </div>
             )}
             {data.summary && (
-              <div className="mt-2 text-sm">
+              <div className="mt-3">
                 <p className="font-medium">AI summary</p>
                 <SafeText text={data.summary} />
               </div>
@@ -208,8 +217,8 @@ export function TicketPage() {
           )}
 
           {canReply && (
-            <section aria-labelledby="reply-heading" className="rounded-lg border border-slate-200 bg-white p-4">
-              <h2 id="reply-heading" className="font-semibold">
+            <section aria-labelledby="reply-heading" className="panel p-4">
+              <h2 id="reply-heading" className="text-base font-medium">
                 Reply to the customer
               </h2>
               <form
@@ -222,19 +231,19 @@ export function TicketPage() {
                 <label htmlFor="reply" className="sr-only">
                   Your reply
                 </label>
-                <textarea id="reply" rows={4} maxLength={4000} value={replyText} onChange={(e) => { setReplyText(e.target.value); }} className="mt-2 w-full rounded-md border border-slate-300 p-2" />
+                <textarea id="reply" rows={4} maxLength={4000} value={replyText} onChange={(e) => { setReplyText(e.target.value); }} className="field mt-2 w-full p-2" />
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <button type="submit" disabled={busy || replyText.trim() === ""} className="rounded-md bg-brand-600 px-4 py-2 font-medium text-white disabled:opacity-50">
+                  <button type="submit" disabled={busy || replyText.trim() === ""} className="btn btn-primary">
                     Send reply
                   </button>
-                  <button type="button" onClick={() => { setIssueOpen(!issueOpen); }} aria-expanded={issueOpen} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
+                  <button type="button" onClick={() => { setIssueOpen(!issueOpen); }} aria-expanded={issueOpen} className="btn btn-secondary">
                     Create Jira issue…
                   </button>
                 </div>
               </form>
               {issueOpen && (
                 <form
-                  className="mt-3 space-y-2 rounded-md border border-slate-200 p-3 text-sm"
+                  className="mt-3 space-y-2 rounded-lg border border-line p-3"
                   onSubmit={(event) => {
                     event.preventDefault();
                     const form = new FormData(event.currentTarget);
@@ -250,7 +259,7 @@ export function TicketPage() {
                 >
                   <label className="block">
                     Type
-                    <select name="issue_type" required className="ml-2 rounded border border-slate-300 px-2 py-1">
+                    <select name="issue_type" required className="field ml-2">
                       <option value="dispute">dispute</option>
                       <option value="fraud">fraud</option>
                       <option value="bug">bug</option>
@@ -259,13 +268,13 @@ export function TicketPage() {
                   </label>
                   <label className="block">
                     Summary
-                    <input name="summary" required maxLength={255} className="mt-1 w-full rounded border border-slate-300 px-2 py-1" />
+                    <input name="summary" required maxLength={255} className="field mt-1 w-full" />
                   </label>
                   <label className="block">
                     Description
-                    <textarea name="description" required maxLength={5000} rows={3} className="mt-1 w-full rounded border border-slate-300 px-2 py-1" />
+                    <textarea name="description" required maxLength={5000} rows={3} className="field mt-1 w-full py-1" />
                   </label>
-                  <button type="submit" disabled={t.createIssue.isPending} className="rounded-md bg-slate-800 px-3 py-1.5 text-white">
+                  <button type="submit" disabled={t.createIssue.isPending} className="btn btn-primary">
                     Create issue
                   </button>
                 </form>

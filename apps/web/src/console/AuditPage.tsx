@@ -49,15 +49,15 @@ export function AuditPage() {
   const field = (key: keyof Filters, label: string, type = "text") => (
     <label className="text-sm">
       {label}
-      <input type={type} value={draft[key]} maxLength={100} onChange={(e) => { setDraft((d) => ({ ...d, [key]: e.target.value })); }} className="mt-1 block w-44 rounded border border-slate-300 px-2 py-1" />
+      <input type={type} value={draft[key]} maxLength={100} onChange={(e) => { setDraft((d) => ({ ...d, [key]: e.target.value })); }} className="mt-1 block w-44 field" />
     </label>
   );
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="px-4 py-5 sm:px-8 md:py-8 lg:px-10">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold">Audit log</h1>
-        <button type="button" onClick={() => { verify.mutate(); }} disabled={verify.isPending} className="ml-auto rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm">
+        <h1 className="flex h-12 items-center page-title">Audit log</h1>
+        <button type="button" onClick={() => { verify.mutate(); }} disabled={verify.isPending} className="ml-auto btn btn-secondary">
           {verify.isPending ? "Checking…" : "Verify chain"}
         </button>
       </div>
@@ -74,11 +74,11 @@ export function AuditPage() {
         {field("actor_id", "Actor id")}
         {field("from", "From", "datetime-local")}
         {field("to", "To", "datetime-local")}
-        <button type="submit" className="rounded-md bg-brand-600 px-4 py-1.5 font-medium text-white">
+        <button type="submit" className="btn btn-primary">
           Filter
         </button>
       </form>
-      <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <div className="mt-4 overflow-x-auto">
         {log.isPending ? (
           <Loading label="Loading the audit log" />
         ) : log.isError ? (
@@ -86,27 +86,27 @@ export function AuditPage() {
         ) : rows.length === 0 ? (
           <p className="p-6 text-muted">No records.</p>
         ) : (
-          <table className="w-full min-w-[48rem] text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-muted">
+          <table className="data-table min-w-[48rem]">
+            <thead>
               <tr>
-                <th scope="col" className="p-2">#</th>
-                <th scope="col" className="p-2">Time</th>
-                <th scope="col" className="p-2">Actor</th>
-                <th scope="col" className="p-2">Action</th>
-                <th scope="col" className="p-2">Entity</th>
-                <th scope="col" className="p-2"><span className="sr-only">Details</span></th>
+                <th scope="col">#</th>
+                <th scope="col">Time</th>
+                <th scope="col">Actor</th>
+                <th scope="col">Action</th>
+                <th scope="col">Entity</th>
+                <th scope="col"><span className="sr-only">Details</span></th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.id} className="border-t border-slate-100">
-                  <td className="p-2 tabular-nums">{row.id}</td>
-                  <td className="p-2">{new Date(row.ts).toLocaleString()}</td>
-                  <td className="p-2">{row.actor_type}{row.actor_id ? ` · ${row.actor_id.slice(0, 8)}` : ""}</td>
-                  <td className="p-2 font-mono text-xs">{row.action}</td>
-                  <td className="p-2">{row.entity_type} · {row.entity_id.slice(0, 12)}</td>
-                  <td className="p-2">
-                    <button type="button" onClick={() => { setOpen(row); }} className="text-brand-700 underline">
+                <tr key={row.id}>
+                  <td className="tabular-nums">{row.id}</td>
+                  <td>{new Date(row.ts).toLocaleString()}</td>
+                  <td>{row.actor_type}{row.actor_id ? ` · ${row.actor_id.slice(0, 8)}` : ""}</td>
+                  <td className="font-mono text-xs">{row.action}</td>
+                  <td>{row.entity_type} · {row.entity_id.slice(0, 12)}</td>
+                  <td>
+                    <button type="button" onClick={() => { setOpen(row); }} className="text-primary-text hover:underline">
                       Details<span className="sr-only"> of record {row.id}</span>
                     </button>
                   </td>
@@ -117,7 +117,7 @@ export function AuditPage() {
         )}
       </div>
       {log.hasNextPage && (
-        <button type="button" onClick={() => void log.fetchNextPage()} disabled={log.isFetchingNextPage} className="mt-3 rounded-md border border-slate-300 px-3 py-1.5 text-sm">
+        <button type="button" onClick={() => void log.fetchNextPage()} disabled={log.isFetchingNextPage} className="mt-3 btn btn-secondary">
           Load older records
         </button>
       )}
@@ -125,7 +125,7 @@ export function AuditPage() {
         <Dialog title={`Record #${open.id}: ${open.action}`} onClose={() => { setOpen(null); }}>
           <pre className="max-h-[60dvh] overflow-auto rounded bg-slate-50 p-3 text-xs">{JSON.stringify(open, null, 2)}</pre>
           <div className="mt-3 text-right">
-            <button type="button" onClick={() => { setOpen(null); }} className="rounded-md border border-slate-300 px-3 py-1.5">
+            <button type="button" onClick={() => { setOpen(null); }} className="btn btn-secondary">
               Close
             </button>
           </div>

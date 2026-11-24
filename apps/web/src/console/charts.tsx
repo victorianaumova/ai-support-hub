@@ -12,22 +12,24 @@ export interface Bar {
 export function BarList({ title, bars }: { title: string; bars: Bar[] }) {
   const max = Math.max(1, ...bars.map((b) => b.value));
   return (
-    <figure aria-label={title} className="rounded-lg border border-slate-200 bg-white p-4">
-      <figcaption className="font-semibold">{title}</figcaption>
+    <figure aria-label={title} className="panel p-6">
+      <figcaption className="text-lg font-medium">{title}</figcaption>
       {bars.length === 0 ? (
-        <p className="mt-2 text-sm text-muted">No data in this period.</p>
+        <p className="mt-3 text-muted">No data in this period.</p>
       ) : (
-        <table className="mt-2 w-full text-sm">
+        <table className="mt-4 w-full">
           <tbody>
             {bars.map((bar) => (
               <tr key={bar.label}>
-                <th scope="row" className="w-1/3 py-1 pr-2 text-left font-normal">
+                <th scope="row" className="w-1/3 py-1.5 pr-3 text-left font-normal text-[var(--tb-text-2)]">
                   {bar.label}
                 </th>
-                <td className="py-1">
-                  <div className="flex items-center gap-2">
-                    <div aria-hidden="true" className="h-3 rounded bg-brand-600" style={{ width: `${(bar.value / max) * 100}%` }} />
-                    <span className="tabular-nums">{bar.shown ?? bar.value}</span>
+                <td className="py-1.5">
+                  <div className="flex items-center gap-3">
+                    <div aria-hidden="true" className="hatch h-7 flex-1 overflow-hidden rounded-full">
+                      <div className="h-full rounded-full bg-accent transition-[width] duration-300" style={{ width: `${(bar.value / max) * 100}%` }} />
+                    </div>
+                    <span className="w-24 shrink-0 tabular-nums">{bar.shown ?? bar.value}</span>
                   </div>
                 </td>
               </tr>
@@ -50,27 +52,30 @@ export interface Series {
 export function StackedDays({ title, series, points }: { title: string; series: Series[]; points: { date: string; values: Record<string, number | null> }[] }) {
   const max = Math.max(1, ...points.map((p) => series.reduce((sum, s) => sum + (p.values[s.key] ?? 0), 0)));
   return (
-    <figure aria-label={title} className="rounded-lg border border-slate-200 bg-white p-4">
-      <figcaption className="font-semibold">{title}</figcaption>
-      <ul className="mt-2 flex flex-wrap gap-3 text-xs">
+    <figure aria-label={title} className="panel p-6">
+      <figcaption className="text-lg font-medium">{title}</figcaption>
+      <ul className="mt-3 flex flex-wrap gap-4 text-xs text-[var(--tb-text-2)]">
         {series.map((s) => (
-          <li key={s.key} className="flex items-center gap-1">
-            <span aria-hidden="true" className={`inline-block size-3 rounded-sm ${s.className}`} />
+          <li key={s.key} className="flex items-center gap-1.5">
+            <span aria-hidden="true" className={`inline-block size-2.5 rounded-full ${s.className}`} />
             {s.label}
           </li>
         ))}
       </ul>
-      <div aria-hidden="true" className="mt-3 flex h-32 items-end gap-1">
+      <div aria-hidden="true" className="mt-4 flex h-40 items-end gap-2">
         {points.map((p) => (
-          <div key={p.date} className="flex h-full flex-1 flex-col-reverse" title={p.date}>
+          <div key={p.date} className="hatch flex h-full flex-1 flex-col-reverse overflow-hidden rounded-xl" title={p.date}>
             {series.map((s) => (
-              <div key={s.key} className={s.className} style={{ height: `${((p.values[s.key] ?? 0) / max) * 100}%` }} />
+              <div key={s.key} className={`${s.className} last:rounded-t-xl`} style={{ height: `${((p.values[s.key] ?? 0) / max) * 100}%` }} />
             ))}
           </div>
         ))}
       </div>
-      <details className="mt-2 text-sm">
-        <summary className="cursor-pointer text-muted">Numbers</summary>
+      <div aria-hidden="true" className="mt-2 flex gap-2 text-xs text-muted">
+        {points.map((p) => <span key={p.date} className="flex-1 truncate text-center">{p.date.slice(5)}</span>)}
+      </div>
+      <details className="mt-3">
+        <summary className="cursor-pointer text-muted hover:text-ink">Numbers</summary>
         <table className="mt-1 w-full">
           <thead>
             <tr>

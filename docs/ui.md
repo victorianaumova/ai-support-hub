@@ -2,7 +2,7 @@
 
 One React app with three areas: customer chat (demo), operator console, lead and compliance pages. Technology: React 19, TypeScript (strict), Vite, React Router, TanStack Query, Tailwind CSS. API types are generated from OpenAPI. No UI component library is required; the builder may use a small headless one (for dialogs, menus) if needed.
 
-Design rules: clean and calm, works at 360 px and up; keyboard reachable; visible focus; colour is never the only signal; WCAG AA contrast. Dates are shown in the browser time zone. All text is English.
+Design rules (look and tokens: §7): clean and calm, works at 360 px and up; keyboard reachable; visible focus; colour is never the only signal; WCAG AA contrast. Dates are shown in the browser time zone. All text is English.
 
 ## 1. Routes
 
@@ -95,3 +95,30 @@ Table with filters (entity, actor, action, time), a detail drawer with the JSON,
 - Accessibility check with axe in the e2e run on the main pages.
 
 As built (P10-05, `apps/web/e2e/`): the scenarios run in order on one database with fake models. Only the SEPA ticket has recorded answers, so "routine question", "approve", "edit" and "stale draft" use it; the fraud report has no recording and is handed off with `system_error`, which still shows the handoff notice and exercises the operator reply. The safe-rendering case (`<img onerror>`, `<script>`, `[x](javascript:…)`, a bare URL) runs in the browser too. axe (WCAG 2.1 A/AA) checks the landing, chat picker, chat, help, login, queue, ticket workspace, dashboard, settings, audit and KB pages.
+
+## 7. Design tokens
+
+The look is a soft, friendly console (P12 polish; feel only, no copied assets): a lavender-grey canvas around one large rounded app card that holds a sidebar and the page; white panels without borders; near-black pill buttons; a periwinkle accent; the key numbers on pastel pink → lavender → periwinkle tiles; open tables divided by 1px lines; pill chips and pill tabs. Strategy (users, personality, principles): [PRODUCT.md](PRODUCT.md). The tokens are CSS variables in `apps/web/src/styles.css` (`:root`, prefix `--tb-`) and are exposed to Tailwind in its `@theme` block.
+
+| Token | Value | Use |
+|---|---|---|
+| `--tb-canvas` / `--tb-shell` / `--tb-bg` | `#dfdee9` / `#f6f6f9` / `#ffffff` | behind the app card / the app card (sidebar, page) / panels, inputs, the selected nav pill |
+| `--tb-surface` / `--tb-surface-hover` | `#f6f6f9` / `#edecf3` | grey boxes / hover of nav items, tab track, neutral chips |
+| `--tb-line` / `--tb-line-strong` | `#e6e5ee` / `#d2d1de` | dividers / table head line, outlined buttons, form controls |
+| `--tb-text` / `--tb-text-2` / `--tb-text-muted` | `#17161d` / `#3e3d4a` / `#636276` | body text; secondary text; muted text and icons (5.4:1 on the shell) |
+| `--tb-primary` / `--tb-primary-hover` | `#17161d` / `#34323f` | primary pill buttons, customer bubble (white text 18:1) |
+| `--tb-primary-text` / `--tb-primary-weak` / `--tb-primary-strong` | `#4b4dad` / `#e8e7f9` / `#26255f` | links, focus ring and accent text (6.6:1 on white); citation and info chips; text on the weak tint |
+| `--tb-accent` / `--tb-accent-2` / `--tb-accent-3` | `#9194df` / `#e58fb1` / `#c9b8ea` | fills only (bars, legend dots, chart series), never text |
+| `--tb-ok`, `--tb-warn`, `--tb-danger`, `--tb-info` (+ `-weak`) | green, amber, raspberry, periwinkle pairs | statuses and banners, each pair ≥ 4.5:1 |
+| `--tb-space` | 8px | spacing grid: Tailwind steps 2, 4, 6, 8 …; step 1 (4px) only inside chips |
+| `--tb-radius` / `--tb-radius-sm` / `--tb-radius-sheet` | 20px / 12px / 28px | panels / form controls, stat tiles / the app card; buttons, chips and tabs are pills |
+| `--tb-row-height` | 56px | queue table rows |
+
+- **Classes.** Semantic colours: `bg-canvas`, `bg-shell`, `bg-surface`, `bg-surface-hover`, `border-line`, `text-ink`, `text-muted`, `bg-primary`, `text-primary-text`, `bg-primary-weak`, `text-primary-strong`, `bg-accent`, `bg-accent-2`, `bg-accent-3`, `shadow-lift`, `rounded-panel`. Components: `page-title` (28px medium, one per page); `btn` + `btn-primary` (near-black, one per area) / `btn-secondary` (white, outlined) / `btn-danger`; `btn-icon` (40px round icon button); `chip` + `chip-info` / `chip-ok` / `chip-warn` / `chip-danger` (pills, always with a word); `field` (40px form control); `panel` (white box, 20px radius); `stat` + `stat-1` … `stat-5` + `stat-icon` (key-number tile: one step of the pastel band and a white round icon); `seg` + `seg-tab` (pill tabs; the selected tab, by `aria-selected`, is a white lifted pill); `hatch` (the hatched empty track of a chart bar); `data-table` (open table: muted header over a strong line, rows divided by light lines, white on hover). The older `slate`, `red`, `amber`, `sky`, `emerald` and `brand` classes are mapped onto the tokens, so a page that still uses them follows the same look.
+- **Statuses** are an icon plus a word (urgent: flag + "Urgent"; over SLA: error icon + time + "over SLA"); colour is never the only signal.
+- **Type.** Onest (variable, `@fontsource-variable/onest`, OFL), self-hosted by the build because the CSP allows fonts only from `'self'`. Body 14px; page titles 28px medium; panel and chart titles 18px medium; the wordmark 22px medium.
+- **Icons.** Material Symbols, outlined, weight 400 (Apache-2.0), only in navigation, status, actions and stat tiles. The path data of the icons in use is generated into `src/components/icons.generated.ts` from the pinned `@material-symbols/svg-400` by `node scripts/icons.mjs`; `<Icon>` draws it inline in the text colour and hides it from screen readers (the text next to it carries the meaning).
+- **Logo.** An original mark (two tally strokes under a bridge arch in a near-black rounded square) with the wordmark "tallybridge" (`src/components/Logo.tsx`); the same mark is `public/favicon.svg`.
+- **Demo marker.** Next to the logo a small white "Demo" pill whose tooltip and screen-reader text say "Demo · fictional company"; the public pages' footer says once that Tallybridge is a fictional company and the data is made up.
+- **Motion.** 160 ms ease-out (quint) on hover, selection and press; bars grow in 300 ms; everything is instant under `prefers-reduced-motion`.
+- **Layouts.** Console and public pages share the frame: the canvas with a 16–24px margin, and the app card filling the rest (under 768px the card fills the screen). Console: a sidebar inside the card (logo and demo pill; pill navigation where the current item is a white lifted pill; the signed-in operator with an initial avatar and a log-out icon button at the bottom; under 768px the navigation is a horizontal strip under the logo row). Pages are left-aligned with a 28px title row (ticket: back arrow, title, status, actions on the right), pill tabs, a filter bar with a rounded search field above tables. The dashboard leads with five stat tiles that read as one pastel band. Landing: a pastel hero with the two entry buttons and three short facts. Login: a centred white panel with the mark.
