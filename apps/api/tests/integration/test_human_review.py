@@ -530,7 +530,7 @@ async def test_recover_continues_a_run_from_its_last_checkpoint(
             fresh, "SELECT node FROM llm_calls WHERE node <> 'embedding' ORDER BY created_at"
         )
     ]
-    # The write/v5 recordings pass the check: no retry (P7-06).
+    # The write/v6 recordings pass the check: no retry (P7-06).
     assert nodes_called == ["triage", "write", "verify"]
     actor, details = _one(
         fresh, "SELECT actor_type, details FROM audit_log WHERE action = 'run.recovered'"

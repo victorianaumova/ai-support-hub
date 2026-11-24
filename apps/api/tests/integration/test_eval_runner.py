@@ -17,8 +17,10 @@ import os
 import re
 import subprocess
 import sys
+import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -27,6 +29,12 @@ import pytest
 from psycopg import sql
 
 from hub.config import Settings
+from hub.db.repositories import CustomerRepository, TicketRepository
+from hub.db.session import connect
+from hub.domain.enums import Intent
+from hub.domain.enums import TicketStatus as S
+from hub.domain.memory import shows_open_case
+from hub.graph.nodes.intake import customer_context
 from hub.graph.pipeline import B0_VARIANT
 from hub.llm.gateway import FIXTURES_DIR, FixtureProvider
 from hub.llm.schemas import ProviderError, ProviderRequest, ProviderResponse, Usage
@@ -37,6 +45,7 @@ from hub_evals.runner import (
     TICKETS_FILE,
     EvalSetupError,
     Options,
+    close_open_tickets,
     load_tickets,
     run,
 )
@@ -636,7 +645,7 @@ async def test_a_rag_ticket_runs_through_the_runner(
     assert {k: v for k, v in aliases.items() if k != EVAL_KB_ALIAS} == app_aliases
 
     (result,) = files.read_results(run_dir / files.RESULTS_FILE)
-    assert result.prompt_versions == {"triage": "v1", "write": "v5", "verify": "v1"}
+    assert result.prompt_versions == {"triage": "v1", "write": "v6", "verify": "v1"}
     assert result.draft is not None
     assert result.draft.evidence["variant"] == "rag_hybrid"
     ranked = result.draft.ranked_chunk_ids
@@ -677,3 +686,108 @@ async def test_a_rag_ticket_runs_through_the_runner(
     assert again.ran == 1
     after = run_sql(eval_db, "SELECT count(*) FROM llm_calls WHERE node = 'embedding'")[0][0]
     assert after - before <= 2  # the estimate's search and the run's search
+
+
+# --- the start state of a run (P12) -------------------------------------------------------------
+
+
+async def _leftover_tickets(urls: Urls, customer_ref: str, intent: str) -> list[uuid.UUID]:
+    """One ticket of `customer_ref` with `intent` in every status, as earlier starts leave them,
+    made through the checked status path."""
+    paths: dict[S, list[S]] = {
+        S.PROCESSING: [],
+        S.PENDING_APPROVAL: [S.PENDING_APPROVAL],
+        S.HANDED_OFF: [S.HANDED_OFF],
+        S.ANSWERED: [S.ANSWERED],
+        S.CLOSED: [S.ANSWERED, S.CLOSED],
+    }
+    database = connect(urls[1])
+    try:
+        async with database.sessions.begin() as session:
+            customer = await CustomerRepository(session).get_by_external_ref(customer_ref)
+            assert customer is not None
+            tickets = TicketRepository(session)
+            ids: list[uuid.UUID] = []
+            for path in paths.values():
+                row = await tickets.create(
+                    customer_id=customer.id, ai_disclosed_at=datetime.now(UTC)
+                )
+                row.intent = Intent(intent)
+                for target in path:
+                    await tickets.change_status(row, target)
+                ids.append(row.id)
+            return ids
+    finally:
+        await database.dispose()
+
+
+async def _repeat_contact(urls: Urls, customer_ref: str, intent: str) -> bool:
+    """What `decide` reads for a new ticket of the customer: `memory_shows_open_case`."""
+    database = connect(urls[1])
+    try:
+        async with database.sessions() as session:
+            customer = await CustomerRepository(session).get_by_external_ref(customer_ref)
+            assert customer is not None
+            context = await customer_context(session, customer.id, uuid.uuid4())
+            return shows_open_case(context, intent, datetime.now(UTC))
+    finally:
+        await database.dispose()
+
+
+async def test_a_start_closes_the_open_tickets_of_earlier_starts(
+    eval_db: Urls, tmp_path: Path
+) -> None:
+    """P12: leftover open tickets made every evaluation ticket a repeat contact
+    (`policy_review`, automation share 0 of 20 in P12-00). Each start closes them first, through
+    the state diagram, so the routing rule itself stays as it is."""
+    tickets = _tickets_file(tmp_path / "tickets.jsonl", [RUN_TICKETS["run_01"]])
+    base = load_tickets(tickets)[0]
+    options = Options(
+        tools=False,
+        tickets=tickets,
+        variant=B0_VARIANT,
+        run_dir=tmp_path / "run",
+        cache_dir=tmp_path / "cache",
+        judges=False,
+    )
+    settings = _settings(eval_db, llm_mode="fake")
+    await run(settings, options)  # seeds the customers
+    leftovers = await _leftover_tickets(eval_db, base.customer_ref, "withdrawal_issue")
+    assert await _repeat_contact(eval_db, base.customer_ref, "withdrawal_issue")
+    open_before = run_sql(eval_db, "SELECT count(*) FROM tickets WHERE status <> 'closed'")[0][0]
+    assert open_before >= 4
+
+    report = await run(settings, dataclass_replace(options, restart=True))
+
+    assert report.ran == 1
+    assert report.tickets_closed == open_before
+    statuses = run_sql(
+        eval_db,
+        "SELECT status FROM tickets WHERE id = ANY(%s)",
+        leftovers,
+    )
+    assert {status for (status,) in statuses} == {"closed"}
+    # Only the ticket of this start is open, so the next start of the same customer and intent
+    # is not a repeat contact of any earlier one once it closes the open ones again.
+    assert run_sql(eval_db, "SELECT count(*) FROM tickets WHERE status <> 'closed'") == [(1,)]
+    database = connect(eval_db[1])
+    try:
+        assert await close_open_tickets(database) == 1
+        assert await close_open_tickets(database) == 0
+    finally:
+        await database.dispose()
+    assert not await _repeat_contact(eval_db, base.customer_ref, "withdrawal_issue")
+    # One audit record per closed ticket, with where it came from; the earlier statuses all
+    # reached `closed` through allowed steps.
+    audited = run_sql(
+        eval_db,
+        "SELECT details->>'from_status' FROM audit_log WHERE action = 'ticket.closed'"
+        " AND details->>'job' = 'eval-reset' AND entity_id = ANY(%s)",
+        [str(ticket_id) for ticket_id in leftovers],
+    )
+    assert sorted(status for (status,) in audited) == [
+        "answered",
+        "handed_off",
+        "pending_approval",
+        "processing",
+    ]

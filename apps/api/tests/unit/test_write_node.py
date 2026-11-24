@@ -101,7 +101,7 @@ def test_chunks_are_rendered_in_rank_order_with_their_source_id() -> None:
 
 
 def test_the_active_write_prompt_has_the_hits_and_the_ticket_in_the_user_part() -> None:
-    assert PROMPT.version == "write/v5"
+    assert PROMPT.version == "write/v6"
     assert PROMPT.front.role == "write"
     assert PROMPT.placeholders == {"kb", "account_facts", "memory", "history", "ticket"}
     assert "{{" not in PROMPT.system
@@ -218,7 +218,7 @@ async def test_write_records_its_node_prompt_version_and_run() -> None:
     [row] = recorder.rows
     assert (row.node, row.prompt_version, row.run_id, row.context, row.status) == (
         LlmNode.WRITE,
-        "write/v5",
+        "write/v6",
         run_id,
         LlmCallContext.ONLINE,
         LlmCallStatus.OK,
@@ -277,7 +277,7 @@ def test_the_write_requests_on_disk_are_recorded() -> None:
     ]
     verified = {path.name for path, _ in specs if path.name.endswith("_verify.json")}
     assert verified == {"run_01_verify.json"}  # run_02 cannot answer: no verify call
-    # write/v5 (P7-07): run_01's recorded verify answer passes, so the recorded run makes no
+    # write/v6 (P7-07): run_01's recorded verify answer passes, so the recorded run makes no
     # retry (the retry itself is covered with a verifier that never passes, P6-04).
     retried = {path.name for path, _ in specs if "_retry" in path.name}
     assert retried == set()

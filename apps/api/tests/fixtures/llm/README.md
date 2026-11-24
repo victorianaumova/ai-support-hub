@@ -14,7 +14,7 @@
 - `requests/run_NN_triage.json` and `requests/run_NN_write.json` are generated from
   `../run/tickets.jsonl` by `make llm-requests` with the same functions the run uses (intake,
   the active prompts, `rag_evidence`), so these tickets work through the API in fake mode
-  (integration tests, `make dev`). The write request (`write/v5` since P7-07; `write/v4`, P7-06; `write/v3`, P7-04; `write/v2`, P5-03)
+  (integration tests, `make dev`). The write request (`write/v6` since P12; `write/v5`, P7-07; `write/v4`, P7-06; `write/v3`, P7-04; `write/v2`, P5-03)
   holds the six search hits of the ticket, kept in `../run/evidence.json`, and no account facts
   or memory (`(none)`): these runs have no tool client, so they make no research call; `make llm-requests` searches again with the
   real local models (Qdrant in-memory mode, needs `make models`), and an integration test checks

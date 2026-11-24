@@ -4,6 +4,7 @@ estimate and limit, the summary files. The whole run against Postgres is tested 
 
 import json
 from decimal import Decimal
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +12,8 @@ import pytest
 
 from hub.config import Settings
 from hub.db.session import connect
-from hub.domain.enums import LlmCallMode
+from hub.domain.enums import LlmCallMode, TicketStatus
+from hub.domain.ticket_status import can_transition
 from hub.graph.draft import b0_evidence
 from hub.kb.chunk_text import render_chunks
 from hub.kb.full_text import KbSource, render_kb
@@ -31,6 +33,7 @@ from hub_evals.runner import (
     Report,
     build_pipeline,
     cited_sources,
+    close_path,
     describe,
     estimate_cost,
     estimate_tokens,
@@ -131,6 +134,20 @@ def test_a_missing_or_invalid_ticket_file_is_a_setup_error(tmp_path: Path) -> No
     broken.write_text('\n{"id": "T-1"}\n', encoding="utf-8")
     with pytest.raises(EvalSetupError, match="line 2 is invalid"):
         load_tickets(broken)
+
+
+def test_close_path_keeps_to_the_state_diagram() -> None:
+    """P12: every open status reaches `closed` through allowed steps only."""
+    for status in TicketStatus:
+        path = close_path(status)
+        assert (path[-1] if path else status) == TicketStatus.CLOSED
+        steps = [status, *path]
+        assert all(can_transition(a, b) for a, b in pairwise(steps))
+    assert close_path(TicketStatus.CLOSED) == []
+    assert close_path(TicketStatus.PENDING_APPROVAL) == [
+        TicketStatus.HANDED_OFF,
+        TicketStatus.CLOSED,
+    ]
 
 
 def test_pending_skips_finished_tickets() -> None:
@@ -360,12 +377,14 @@ def test_describe_names_counts_only(tmp_path: Path) -> None:
         stopped_at_cost_limit=True,
         stopped_by_estimate=True,
         unavailable=2,
+        tickets_closed=3,
     )
     lines = describe(report, Settings(_env_file=None))
     assert any("2 tickets failed because the model was unavailable" in line for line in lines)
     assert any("estimate is above" in line for line in lines)
     assert any("10 tickets, 4 already finished, 6 run now" in line for line in lines)
     assert any("EVAL_MAX_COST_USD" in line for line in lines)
+    assert "eval: closed 3 open tickets of earlier starts" in lines
 
 
 # --- summary ------------------------------------------------------------------------------------
