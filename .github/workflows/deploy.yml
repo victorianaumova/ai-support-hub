@@ -140,6 +140,8 @@ jobs:
         id: smoke
         env:
           DEMO_ACCESS_CODE: ${{ secrets.DEMO_ACCESS_CODE }}
+          # The canary closes its own ticket as the demo admin (infra/deploy/smoke.py).
+          SEED_OPERATOR_PASSWORD: ${{ secrets.SEED_OPERATOR_PASSWORD }}
         run: uv run python infra/deploy/smoke.py --url "$API_URL" --canary
 
       - name: Roll back to the previous revision

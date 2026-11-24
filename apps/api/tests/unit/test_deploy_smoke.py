@@ -1,11 +1,13 @@
-"""The post-deploy canary (infra/deploy/smoke.py, P12): it asks as a customer that cannot be a
-repeat contact, reads the stream in any field order and accepts only the auto_reply and approval
-routes."""
+"""The post-deploy canary (infra/deploy/smoke.py, P12): it asks as one fixed, non-restricted demo
+customer, reads the stream in any field order, accepts only the auto_reply and approval routes and
+closes its own ticket afterwards (best effort)."""
 
 import importlib.util
 import json
-from datetime import UTC, datetime, timedelta
+from collections.abc import Iterator
+from contextlib import contextmanager
 from types import ModuleType
+from typing import Any
 
 import pytest
 
@@ -22,30 +24,6 @@ def _load() -> ModuleType:
 
 
 smoke = _load()
-NOW = datetime(2026, 11, 24, 12, 0, tzinfo=UTC)
-
-
-def _ticket(status: str, age: timedelta) -> dict[str, str]:
-    return {"status": status, "created_at": (NOW - age).isoformat()}
-
-
-@pytest.mark.parametrize(
-    ("tickets", "clean"),
-    [
-        ([], True),
-        ([_ticket("closed", timedelta(days=18))], True),
-        # closed, but its memory item may still be in the 14-day window
-        ([_ticket("closed", timedelta(days=10))], False),
-        # open, however old: an open ticket on the same intent is a repeat contact
-        ([_ticket("answered", timedelta(days=30))], False),
-        ([_ticket("pending_approval", timedelta(days=30))], False),
-        ([_ticket("closed", timedelta(days=40)), _ticket("handed_off", timedelta(days=1))], False),
-    ],
-)
-def test_a_customer_is_clean_without_an_open_or_recent_ticket(
-    tickets: list[dict[str, str]], clean: bool
-) -> None:
-    assert smoke.is_clean(tickets, NOW) is clean
 
 
 def _lines(*events: tuple[str, object]) -> list[str]:
@@ -85,61 +63,154 @@ def test_the_canary_fails_on_a_handoff_an_error_or_a_cut_stream(
 
 
 class _Response:
-    def __init__(self, body: object = None, cookies: dict[str, str] | None = None) -> None:
+    def __init__(
+        self, body: object = None, cookies: dict[str, str] | None = None, status: int = 200
+    ) -> None:
         self._body = body
         self.cookies = cookies or {}
+        self.status_code = status
+        self.text = json.dumps(body)
 
     def raise_for_status(self) -> None:
-        return None
+        if self.status_code >= 400:
+            raise smoke.httpx2.HTTPStatusError("failed", request=None, response=None)
 
     def json(self) -> object:
         return self._body
 
+    def iter_lines(self) -> Iterator[str]:
+        yield from self._body  # type: ignore[misc]
 
-class _Client:
-    """The two demo endpoints and the ticket list, with no network: `tickets` per customer."""
 
-    def __init__(self, listed: list[str], tickets: dict[str, list[dict[str, str]]]) -> None:
-        self.listed = listed
-        self.tickets = tickets
+class _Demo:
+    """The demo API with no network: one canary stream, then the console's ticket that moves
+    through `states` (status, has a draft); each reject or close moves it to the next state."""
+
+    def __init__(
+        self,
+        route_status: str = "answered",
+        states: list[str] | None = None,
+        login_status: int = 200,
+        stale_first_close: bool = False,
+    ) -> None:
+        self.route_status = route_status
+        self.states = states if states is not None else ["answered", "closed"]
+        self.login_status = login_status
+        self.stale_first_close = stale_first_close
+        self.calls: list[str] = []
         self.logins: list[str] = []
+        self.version = 1
 
-    def post(self, path: str, json: dict[str, str]) -> _Response:
-        assert path == "/api/v1/demo/session"
-        self.logins.append(json["customer_ref"])
-        return _Response(cookies={"hub_customer": json["customer_ref"]})
+    def post(
+        self, path: str, json: dict[str, Any], headers: dict[str, str] | None = None
+    ) -> _Response:
+        self.calls.append(path)
+        if path == "/api/v1/demo/session":
+            self.logins.append(json["customer_ref"])
+            return _Response(cookies={"hub_customer": json["customer_ref"]})
+        if path == "/api/v1/auth/login":
+            assert json["email"] == smoke.CANARY_OPERATOR
+            return _Response({"csrf_token": "csrf"}, {"hub_operator": "op"}, self.login_status)
+        assert headers is not None
+        assert headers["X-CSRF-Token"] == "csrf"
+        assert json["ticket_version"] == self.version
+        if path.endswith("/close") and self.stale_first_close:
+            self.stale_first_close = False
+            self.version += 1
+            return _Response({"code": "stale_draft"}, status=409)
+        if path.endswith("/reject"):
+            assert path == "/api/v1/console/drafts/d1/reject"
+            assert "Idempotency-Key" in headers
+        self.states.pop(0)
+        self.version += 1
+        return _Response({})
 
-    def get(self, path: str, headers: dict[str, str], params: object = None) -> _Response:
-        if path == "/api/v1/demo/customers":
-            return _Response([{"customer_ref": ref} for ref in self.listed])
-        ref = headers["Cookie"].removeprefix("hub_customer=")
-        return _Response({"items": self.tickets.get(ref, []), "next_cursor": None})
+    def get(self, path: str, headers: dict[str, str]) -> _Response:
+        self.calls.append(path)
+        assert path == "/api/v1/console/tickets/t1"
+        status = self.states[0]
+        if status == "processing":
+            self.states.pop(0)
+        draft = {"id": "d1"} if status == "pending_approval" else None
+        return _Response({"status": status, "version": self.version, "draft": draft})
+
+    @contextmanager
+    def stream(
+        self, method: str, path: str, json: object, headers: dict[str, str]
+    ) -> Iterator[_Response]:
+        assert headers["Cookie"] == f"hub_customer={smoke.CANARY_CUSTOMER}"
+        yield _Response(
+            _lines(
+                ("ticket.created", {"ticket_id": "t1", "message": {}}),
+                ("message", {}),
+                ("ticket.status", {"status": self.route_status}),
+                ("done", {}),
+            )
+        )
 
 
-def test_the_canary_never_asks_as_a_restricted_customer() -> None:
-    # Deploy #17: CUS-0007 (restricted) came first and the canary was handed off.
-    client = _Client(["CUS-0007", "CUS-0001", "CUS-0016"], {})
-    ref, cookie = smoke.clean_customer(client, "code")
-    assert ref == "CUS-0001"
-    assert cookie == {"Cookie": "hub_customer=CUS-0001"}
-    assert "CUS-0007" not in client.logins
+@pytest.fixture(autouse=True)
+def _no_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(smoke.time, "sleep", lambda _: None)
 
 
-def test_the_canary_takes_the_next_clean_allowed_customer() -> None:
-    recent = [_ticket("closed", timedelta(days=1))]
-    client = _Client(["CUS-0007", "CUS-0001", "CUS-0016"], {"CUS-0001": recent})
-    assert smoke.clean_customer(client, "code")[0] == "CUS-0016"
+def test_the_canary_asks_as_the_fixed_customer_and_closes_its_answered_ticket() -> None:
+    demo = _Demo()
+    smoke.canary(demo, "code", "pw")
+    assert demo.logins == [smoke.CANARY_CUSTOMER]
+    assert demo.calls[-1] == "/api/v1/console/tickets/t1/close"
+    assert demo.states == ["closed"]
 
 
-def test_the_canary_fails_when_only_restricted_customers_are_listed() -> None:
-    with pytest.raises(SystemExit, match="non-restricted"):
-        smoke.clean_customer(_Client(["CUS-0007"], {}), "code")
+def test_a_draft_waiting_for_approval_is_rejected_without_a_reply_then_the_ticket_is_closed() -> (
+    None
+):
+    demo = _Demo("pending_approval", ["pending_approval", "handed_off", "closed"])
+    smoke.canary(demo, "code", "pw")
+    posts = [c for c in demo.calls if c.startswith("/api/v1/console/") and not c.endswith("t1")]
+    assert posts == ["/api/v1/console/drafts/d1/reject", "/api/v1/console/tickets/t1/close"]
+    assert demo.states == ["closed"]
 
 
-def test_the_canary_customers_are_demo_customers_and_not_restricted() -> None:
+def test_a_run_still_finishing_and_a_stale_version_are_read_again() -> None:
+    demo = _Demo(states=["processing", "answered", "closed"], stale_first_close=True)
+    smoke.canary(demo, "code", "pw")
+    assert demo.calls.count("/api/v1/console/tickets/t1/close") == 2
+    assert demo.states == ["closed"]
+
+
+def test_a_failed_close_is_a_warning_and_not_a_failed_check(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    demo = _Demo(login_status=401)
+    smoke.canary(demo, "code", "pw")
+    assert "::warning::the canary ticket t1 was not closed" in capsys.readouterr().out
+    assert "/api/v1/console/tickets/t1/close" not in demo.calls
+
+
+def test_a_ticket_that_never_closes_is_a_warning(capsys: pytest.CaptureFixture[str]) -> None:
+    demo = _Demo(states=["processing"] * (smoke.CLOSE_ATTEMPTS + 5))
+    smoke.canary(demo, "code", "pw")
+    assert "could not be closed" in capsys.readouterr().out
+
+
+def test_a_handoff_fails_the_canary_before_any_close() -> None:
+    demo = _Demo("handed_off")
+    with pytest.raises(SystemExit, match="handed_off"):
+        smoke.canary(demo, "code", "pw")
+    assert not [c for c in demo.calls if c.startswith("/api/v1/console/")]
+
+
+def test_the_canary_customer_is_a_demo_customer_and_not_restricted() -> None:
+    # Deploy #17: the canary asked as CUS-0007 (restricted) and was handed off.
     demo = {entry["customer_ref"] for entry in json.loads(
         (ROOT / "data/seed/demo_customers.json").read_text())}  # fmt: skip
     customers = json.loads((ROOT / "data/seed/customers.json").read_text())
     restricted = {c["external_ref"] for c in customers if c["restricted"]}
-    assert set(smoke.CANARY_CUSTOMERS) <= demo
-    assert not set(smoke.CANARY_CUSTOMERS) & restricted
+    assert smoke.CANARY_CUSTOMER in demo
+    assert smoke.CANARY_CUSTOMER not in restricted
+
+
+def test_the_canary_operator_is_the_demo_admin() -> None:
+    operators = json.loads((ROOT / "data/seed/operators.json").read_text())
+    assert {o["email"]: o["role"] for o in operators}[smoke.CANARY_OPERATOR] == "admin"
