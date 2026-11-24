@@ -6,9 +6,9 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
 const NAMES = [
-  "add", "arrow_back", "arrow_forward", "chat", "check_circle", "description", "error", "filter_list", "flag", "history",
-  "hourglass_top", "inbox", "info", "lock", "logout", "menu_book", "monitoring", "person",
-  "refresh", "schedule", "search", "send", "settings", "smart_toy", "support_agent",
+  "account_balance_wallet", "add", "arrow_back", "arrow_forward", "chat", "check_circle", "description", "dock_to_right", "error", "filter_list", "flag", "history",
+  "hourglass_top", "inbox", "info", "lock", "logout", "menu_book", "monitoring", "more_horiz", "payments", "person",
+  "refresh", "schedule", "search", "send", "settings", "smart_toy", "speed", "support_agent", "timer", "unfold_more",
   "thumb_down", "thumb_up", "verified_user", "warning",
 ];
 

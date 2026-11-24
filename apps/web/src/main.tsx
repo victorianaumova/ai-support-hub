@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app/App";
-import "@fontsource-variable/roboto/wght.css";
+import "@fontsource-variable/onest/wght.css";
 import "./styles.css";
 
 const root = document.getElementById("root");

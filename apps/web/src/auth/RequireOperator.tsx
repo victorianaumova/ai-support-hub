@@ -17,7 +17,7 @@ export function RequireOperator({ roles, children }: { roles: readonly Role[]; c
   if (!hasRole(session.data, roles)) {
     return (
       <div role="alert" className="mx-auto max-w-xl p-6">
-        <h1 className="text-[1.375rem] font-normal">No access</h1>
+        <h1 className="page-title">No access</h1>
         <p className="mt-2 text-muted">Your role ({session.data.role}) cannot open this page.</p>
       </div>
     );

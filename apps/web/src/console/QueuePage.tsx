@@ -12,7 +12,7 @@ const EMPTY: Filters = { intent: "", urgency: "", reason: "", q: "" };
 function Counter({ tab, filters }: { tab: TabId; filters: Filters }) {
   const { data } = useQueue(tab, filters);
   if (!data) return null;
-  return <span className="ml-2 rounded-full bg-surface-hover px-2 text-xs font-medium text-[var(--tb-text-2)]">{data.items.length}{data.next_cursor ? "+" : ""}</span>;
+  return <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--tb-line)] px-1.5 text-xs font-medium tabular-nums text-[var(--tb-text-2)] [[aria-selected=true]_&]:bg-primary [[aria-selected=true]_&]:text-white">{data.items.length}{data.next_cursor ? "+" : ""}</span>;
 }
 
 function Row({ row, isNew, now }: { row: QueueRow; isNew: boolean; now: Date }) {
@@ -32,10 +32,10 @@ function Row({ row, isNew, now }: { row: QueueRow; isNew: boolean; now: Date }) 
         {isNew && <span className="chip chip-warn ml-2">New</span>}
       </td>
       <td>
-        <Link to={`/console/tickets/${row.id}`} className="text-primary-text underline-offset-2 hover:underline">
+        <Link to={`/console/tickets/${row.id}`} className="whitespace-nowrap font-medium text-ink underline-offset-4 hover:text-primary-text hover:underline">
           {row.customer.display_name}
         </Link>
-        <span className="block text-xs capitalize text-muted">
+        <span className="block whitespace-nowrap text-xs capitalize text-muted">
           {row.customer.tier} · {row.customer.customer_ref}
         </span>
       </td>
@@ -90,11 +90,12 @@ export function QueuePage() {
   };
 
   return (
-    <div className="px-4 py-4 sm:px-6">
-      <div className="flex h-12 items-center">
-        <h1 className="text-[1.375rem] font-normal">Ticket queue</h1>
+    <div className="px-4 py-5 sm:px-8 md:py-8 lg:px-10">
+      <div className="flex min-h-12 flex-wrap items-center gap-x-4 gap-y-1">
+        <h1 className="page-title">Ticket queue</h1>
+        <p className="text-muted">Most urgent and longest waiting first · refreshes every 5 s</p>
       </div>
-      <div role="tablist" aria-label="Queues" className="mt-2 flex flex-wrap border-b border-line">
+      <div role="tablist" aria-label="Queues" className="seg mt-6 max-w-full flex-wrap">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -106,38 +107,38 @@ export function QueuePage() {
               seen.current = null;
               setNewIds(new Set());
             }}
-            className={`-mb-px flex h-12 items-center border-b-[3px] px-4 font-medium ${tab === t.id ? "border-primary text-primary-text" : "border-transparent text-ink hover:bg-surface-hover"}`}
+            className="seg-tab"
           >
             {t.label}
             <Counter tab={t.id} filters={filters} />
           </button>
         ))}
       </div>
-      <form role="search" className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line py-2" onSubmit={(e) => { e.preventDefault(); }}>
-        <label className="flex min-w-[16rem] flex-1 items-center gap-2 font-medium">
-          <Icon name="filter_list" />
-          Filter
-          <input value={filters.q} maxLength={200} onChange={(e) => { set("q")(e.target.value); }} placeholder="Summary, name or CUS-…" aria-label="Search" className="h-8 min-w-0 flex-1 border-0 bg-transparent px-2 font-normal placeholder:text-muted focus-visible:outline-offset-0" />
+      <form role="search" className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line pb-4" onSubmit={(e) => { e.preventDefault(); }}>
+        <label className="flex h-10 min-w-[16rem] flex-1 items-center gap-2 rounded-full bg-white px-4 text-muted shadow-lift focus-within:outline-2 focus-within:outline-[var(--tb-primary-text)]">
+          <Icon name="search" />
+          <span className="sr-only">Filter</span>
+          <input value={filters.q} maxLength={200} onChange={(e) => { set("q")(e.target.value); }} placeholder="Search summary, name or CUS-…" aria-label="Search" className="h-full min-w-0 flex-1 border-0 bg-transparent text-ink outline-none" />
         </label>
-        <label className="text-muted">
+        <label className="flex items-center text-muted">
           Intent
-          <select value={filters.intent} onChange={(e) => { set("intent")(e.target.value); }} className="field ml-2 rounded-full px-3 text-ink">
+          <select value={filters.intent} onChange={(e) => { set("intent")(e.target.value); }} className="field ml-2 rounded-full bg-white px-3 text-ink">
             <option value="">Any</option>
             {INTENTS.map((i) => <option key={i} value={i}>{words(i)}</option>)}
           </select>
         </label>
-        <label className="text-muted">
+        <label className="flex items-center text-muted">
           Urgency
-          <select value={filters.urgency} onChange={(e) => { set("urgency")(e.target.value); }} className="field ml-2 rounded-full px-3 text-ink">
+          <select value={filters.urgency} onChange={(e) => { set("urgency")(e.target.value); }} className="field ml-2 rounded-full bg-white px-3 text-ink">
             <option value="">Any</option>
             <option value="high">high</option>
             <option value="normal">normal</option>
             <option value="low">low</option>
           </select>
         </label>
-        <label className="text-muted">
+        <label className="flex items-center text-muted">
           Reason
-          <select value={filters.reason} onChange={(e) => { set("reason")(e.target.value); }} className="field ml-2 rounded-full px-3 text-ink">
+          <select value={filters.reason} onChange={(e) => { set("reason")(e.target.value); }} className="field ml-2 rounded-full bg-white px-3 text-ink">
             <option value="">Any</option>
             {Object.keys(REASONS).map((r) => <option key={r} value={r}>{words(r)}</option>)}
           </select>
@@ -150,10 +151,10 @@ export function QueuePage() {
           <ErrorState error={queue.error} onRetry={() => void queue.refetch()} />
         ) : queue.data.items.length === 0 ? (
           <div className="flex flex-col items-center px-6 py-12 text-center">
-            <span aria-hidden="true" className="flex size-12 items-center justify-center rounded-full bg-surface-hover text-muted">
+            <span aria-hidden="true" className="flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-[#f8dce7] to-[#dce0f8] text-ink">
               <Icon name="inbox" size={24} />
             </span>
-            <p className="mt-3 text-base">No tickets here.</p>
+            <p className="mt-4 text-lg font-medium">No tickets here.</p>
             <p className="mt-1 text-muted">New tickets appear on their own; the list refreshes every 5 seconds.</p>
           </div>
         ) : (

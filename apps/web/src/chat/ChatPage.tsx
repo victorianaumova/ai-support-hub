@@ -98,7 +98,7 @@ function Chat({ profile, suggestions, onSwitch }: { profile: Profile; suggestion
           </button>
           </div>
         </div>
-        <h2 className="mt-6 px-1 text-xs font-medium uppercase tracking-wide text-muted">Earlier conversations</h2>
+        <h2 className="mt-6 px-1 text-base font-medium">Earlier conversations</h2>
         <button
           type="button"
           onClick={() => {
@@ -155,7 +155,7 @@ function Chat({ profile, suggestions, onSwitch }: { profile: Profile; suggestion
           <span>{AI_NOTICE}</span>
         </p>
 
-        <div className="flex-1 overflow-y-auto bg-surface p-4 sm:p-6">
+        <div className="flex-1 overflow-y-auto bg-white p-4 sm:p-6">
           {state.messages.length === 0 && !streaming && (
             <div className="py-8 text-center text-muted">
               <span aria-hidden="true" className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary-weak text-[var(--tb-primary-strong)]">
@@ -169,7 +169,7 @@ function Chat({ profile, suggestions, onSwitch }: { profile: Profile; suggestion
                       <button
                         type="button"
                         onClick={() => void send(text)}
-                        className="rounded-full border border-line bg-white px-4 py-2 text-left text-primary-text hover:border-primary-weak hover:bg-primary-weak"
+                        className="rounded-full bg-primary-weak px-4 py-2 text-left text-[var(--tb-primary-strong)] transition-colors hover:bg-[#dddcf6]"
                       >
                         {text}
                       </button>
@@ -192,37 +192,37 @@ function Chat({ profile, suggestions, onSwitch }: { profile: Profile; suggestion
             </p>
           )}
           {state.assistantDown && (
-            <p role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950">
+            <p role="alert" className="mt-4 flex items-start gap-2 rounded-2xl bg-amber-50 p-3 text-amber-950">
               <Icon name="warning" size={18} />
               Our assistant is not available now; a human will answer.
             </p>
           )}
           {!streaming && state.status === "pending_approval" && (
-            <p role="status" className="mt-4 flex items-start gap-3 rounded-lg border border-sky-300 bg-sky-50 p-4 text-sky-950">
+            <p role="status" className="mt-4 flex items-start gap-3 rounded-2xl bg-sky-50 p-4 text-sky-950">
               <Icon name="hourglass_top" />
               A support specialist is checking the answer before it is sent. It will appear here.
             </p>
           )}
           {!streaming && state.status === "handed_off" && !state.assistantDown && (
-            <p role="status" className="mt-4 flex items-start gap-3 rounded-lg border border-sky-300 bg-sky-50 p-4 text-sky-950">
+            <p role="status" className="mt-4 flex items-start gap-3 rounded-2xl bg-sky-50 p-4 text-sky-950">
               <Icon name="hourglass_top" />
               Waiting for a support specialist. Their reply will appear here.
             </p>
           )}
           {state.status === "closed" && (
-            <p role="status" className="mt-4 flex items-start gap-3 rounded-lg border border-line bg-white p-4 text-muted">
+            <p role="status" className="mt-4 flex items-start gap-3 rounded-2xl bg-surface p-4 text-muted">
               <Icon name="check_circle" />
               This conversation is closed. A new message starts a new conversation.
             </p>
           )}
           {state.phase.kind === "rate_limited" && (
-            <p role="alert" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950">
+            <p role="alert" className="mt-4 rounded-2xl bg-amber-50 p-3 text-amber-950">
               You are sending messages too quickly.{" "}
               {state.phase.retryAfterS !== null ? `Please try again in ${Math.ceil(state.phase.retryAfterS)} seconds.` : "Please try again in a minute."}
             </p>
           )}
           {state.phase.kind === "failed" && (
-            <div role="alert" className="mt-4 rounded-lg border border-red-300 bg-red-50 p-3 text-red-900">
+            <div role="alert" className="mt-4 rounded-2xl bg-red-50 p-3 text-red-900">
               <p>Your message could not be sent. {describeError(state.phase.error)}</p>
               <button
                 type="button"

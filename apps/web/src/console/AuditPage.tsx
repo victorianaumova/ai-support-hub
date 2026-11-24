@@ -54,9 +54,9 @@ export function AuditPage() {
   );
 
   return (
-    <div className="px-4 py-4 sm:px-6">
+    <div className="px-4 py-5 sm:px-8 md:py-8 lg:px-10">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="flex h-12 items-center text-[1.375rem] font-normal">Audit log</h1>
+        <h1 className="flex h-12 items-center page-title">Audit log</h1>
         <button type="button" onClick={() => { verify.mutate(); }} disabled={verify.isPending} className="ml-auto btn btn-secondary">
           {verify.isPending ? "Checking…" : "Verify chain"}
         </button>

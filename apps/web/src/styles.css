@@ -1,53 +1,64 @@
 @import "tailwindcss";
 
-/* Design tokens (UI §7). A calm, dense admin-console look: white and light grey surfaces, one
- * blue, a grey text scale, 1px borders instead of shadows, an 8px grid and an 8px radius.
- * Every text/background pair below meets WCAG AA (4.5:1); colour is never the only signal. */
+/* Design tokens (UI §7). A soft, friendly console: a lavender-grey canvas, one large rounded app
+ * card, white panels without borders, near-black pill buttons, a periwinkle accent and pastel
+ * pink → lavender → periwinkle tiles for the key numbers. Every text/background pair meets
+ * WCAG AA (4.5:1); colour is never the only signal. */
 :root {
-  --tb-bg: #ffffff; /* the content sheet, panels, inputs */
-  --tb-shell: #f8fafd; /* app frame: header, nav rail, page behind the sheet */
-  --tb-surface: #f8fafd;
-  --tb-surface-hover: #f0f4f9;
-  --tb-line: #e1e3e1; /* dividers and panel borders */
-  --tb-line-strong: #c4c7c5; /* outlined buttons and form controls */
+  --tb-canvas: #dfdee9; /* behind the app card */
+  --tb-shell: #f6f6f9; /* the app card: sidebar and page background */
+  --tb-bg: #ffffff; /* panels, inputs, the selected nav pill */
+  --tb-surface: #f6f6f9;
+  --tb-surface-hover: #edecf3;
+  --tb-line: #e6e5ee; /* dividers */
+  --tb-line-strong: #d2d1de; /* table head line, outlined buttons, form controls */
 
-  --tb-text: #1f1f1f;
-  --tb-text-2: #444746;
-  --tb-text-muted: #5e6368; /* 5.8:1 on --tb-shell */
+  --tb-text: #17161d;
+  --tb-text-2: #3e3d4a;
+  --tb-text-muted: #636276; /* 5.4:1 on --tb-shell, 5.9:1 on white */
 
-  --tb-primary: #0b57d0; /* fills; white text on it is 6.4:1 */
-  --tb-primary-hover: #0842a0;
-  --tb-primary-text: #0b57d0; /* links and blue text: 6.1:1 on the shell */
-  --tb-primary-weak: #d3e3fd; /* selected nav item, citation chips */
-  --tb-primary-strong: #041e49; /* text on --tb-primary-weak */
-  --tb-primary-hover-tint: rgb(11 87 208 / 0.08);
+  --tb-primary: #17161d; /* primary pill buttons; white text 18:1 */
+  --tb-primary-hover: #34323f;
+  --tb-primary-text: #4b4dad; /* links and accent text: 6.6:1 on white, 6.1:1 on the shell */
+  --tb-primary-weak: #e8e7f9; /* citation chips, info chips */
+  --tb-primary-strong: #26255f; /* text on --tb-primary-weak */
+  --tb-primary-hover-tint: rgb(75 77 173 / 0.08);
 
-  --tb-ok: #146c2e;
-  --tb-ok-weak: #e6f4ea;
-  --tb-warn: #7a4100;
-  --tb-warn-weak: #fef7e0;
-  --tb-warn-line: #f9cb6b;
-  --tb-danger: #b3261e;
-  --tb-danger-fill: #b3261e;
-  --tb-danger-weak: #fce8e6;
-  --tb-info: #0b57d0;
-  --tb-info-weak: #e8f0fe;
+  --tb-accent: #9194df; /* periwinkle fills: highlighted bars, progress, dots (not text) */
+  --tb-accent-2: #e58fb1; /* pink fills: the second chart series, markers (not text) */
+  --tb-accent-3: #c9b8ea; /* lavender fills: the third chart series (not text) */
 
-  --tb-space: 8px; /* the grid: use Tailwind steps 2, 4, 6, 8 … (multiples of 8px; 1 = 4px for tight insides) */
-  --tb-radius: 8px;
-  --tb-radius-sm: 4px;
-  --tb-radius-sheet: 16px; /* the white content sheet */
-  --tb-row-height: 44px;
+  --tb-ok: #1d6a3c;
+  --tb-ok-weak: #e4f3e9;
+  --tb-warn: #7a4500;
+  --tb-warn-weak: #fcf1dc;
+  --tb-warn-line: #f1c46b;
+  --tb-danger: #b0244f;
+  --tb-danger-fill: #b0244f;
+  --tb-danger-weak: #fbe6ee;
+  --tb-info: #4b4dad;
+  --tb-info-weak: #ebeafb;
+
+  --tb-space: 8px; /* the grid: Tailwind steps 2, 4, 6, 8 … (step 1 = 4px only inside chips) */
+  --tb-radius: 20px; /* panels */
+  --tb-radius-sm: 12px; /* form controls, small boxes */
+  --tb-radius-sheet: 28px; /* the app card */
+  --tb-row-height: 56px;
+
+  --tb-lift: 0 1px 2px rgb(23 22 29 / 0.06), 0 4px 14px rgb(23 22 29 / 0.05);
+  --tb-frame-shadow: 0 30px 60px -30px rgb(60 52 110 / 0.25);
+  --tb-ease: cubic-bezier(0.22, 1, 0.36, 1); /* ease-out-quint */
 }
 
 @theme {
-  --font-sans: "Roboto Variable", Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --radius-sm: var(--tb-radius-sm);
+  --font-sans: "Onest Variable", Onest, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius-sm: 8px;
   --radius: var(--tb-radius-sm);
-  --radius-md: var(--tb-radius);
-  --radius-lg: var(--tb-radius);
+  --radius-md: var(--tb-radius-sm);
+  --radius-lg: var(--tb-radius-sm);
 
   /* Semantic colours (prefer these in new code: bg-surface, border-line, text-muted …). */
+  --color-canvas: var(--tb-canvas);
   --color-shell: var(--tb-shell);
   --color-surface: var(--tb-surface);
   --color-surface-hover: var(--tb-surface-hover);
@@ -58,11 +69,16 @@
   --color-primary-text: var(--tb-primary-text);
   --color-primary-weak: var(--tb-primary-weak);
   --color-primary-strong: var(--tb-primary-strong);
+  --color-accent: var(--tb-accent);
+  --color-accent-2: var(--tb-accent-2);
+  --color-accent-3: var(--tb-accent-3);
   --radius-sheet: var(--tb-radius-sheet);
+  --radius-panel: var(--tb-radius);
+  --shadow-lift: var(--tb-lift);
 
   /* The older palette classes follow the tokens, so every page shares one look. */
   --color-brand-50: var(--tb-primary-weak);
-  --color-brand-600: var(--tb-primary);
+  --color-brand-600: var(--tb-accent);
   --color-brand-700: var(--tb-primary-text);
 
   --color-slate-50: var(--tb-surface);
@@ -74,23 +90,23 @@
 
   --color-red-50: var(--tb-danger-weak);
   --color-red-100: var(--tb-danger-weak);
-  --color-red-200: #f6aea9;
-  --color-red-300: #f28b82;
-  --color-red-400: #ee675c;
+  --color-red-200: #f3bccf;
+  --color-red-300: #ec9bb7;
+  --color-red-400: #e27a9f;
   --color-red-700: var(--tb-danger-fill);
   --color-red-800: var(--tb-danger);
   --color-red-900: var(--tb-danger);
 
   --color-amber-50: var(--tb-warn-weak);
   --color-amber-100: var(--tb-warn-weak);
-  --color-amber-200: #feefc3;
+  --color-amber-200: #f9e3b4;
   --color-amber-300: var(--tb-warn-line);
   --color-amber-400: var(--tb-warn-line);
   --color-amber-900: var(--tb-warn);
   --color-amber-950: var(--tb-warn);
 
   --color-sky-50: var(--tb-info-weak);
-  --color-sky-300: #aecbfa;
+  --color-sky-300: #c3c4f0;
   --color-sky-950: var(--tb-info);
 
   --color-emerald-50: var(--tb-ok-weak);
@@ -98,24 +114,29 @@
   --color-emerald-800: var(--tb-ok);
   --color-emerald-950: var(--tb-ok);
 
-  /* No drop shadows: surfaces are separated by 1px borders. */
-  --shadow-sm: 0 0 0 1px var(--tb-line);
+  /* One soft lift for things that sit above the page: the selected pill, menus. */
+  --shadow-sm: var(--tb-lift);
 }
 
 @layer base {
   html {
     color: var(--tb-text);
-    background: var(--tb-shell);
+    background: var(--tb-canvas);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
   body {
-    font-size: 0.875rem; /* 14px: the dense console size */
-    line-height: 1.43;
+    font-size: 0.875rem; /* 14px: the console size */
+    line-height: 1.5;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
   }
   /* Visible focus everywhere (UI: keyboard reachable, visible focus). */
   :focus-visible {
-    outline: 2px solid var(--tb-primary);
+    outline: 2px solid var(--tb-primary-text);
     outline-offset: 2px;
   }
   input,
@@ -123,22 +144,57 @@
   textarea {
     background: var(--tb-bg);
   }
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"] {
+    accent-color: var(--tb-primary);
+  }
+  ::placeholder {
+    color: var(--tb-text-muted);
+    opacity: 1;
+  }
 }
 
-/* Buttons: one primary per area, the rest secondary or quiet. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* Page title: large and friendly, one per page. */
+@utility page-title {
+  font-size: 1.75rem;
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+/* Buttons: pills. One primary (near-black) per area, the rest outlined or quiet. */
 @utility btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 36px;
-  padding: 0 16px;
+  min-height: 40px;
+  padding: 0 20px;
   border-radius: 9999px;
   border: 1px solid transparent;
   font-weight: 500;
   font-size: 0.875rem;
   white-space: nowrap;
   cursor: pointer;
+  transition:
+    background-color 160ms var(--tb-ease),
+    border-color 160ms var(--tb-ease),
+    color 160ms var(--tb-ease),
+    transform 160ms var(--tb-ease);
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
   &:disabled {
     cursor: not-allowed;
   }
@@ -155,11 +211,11 @@
   }
 }
 @utility btn-secondary {
-  background: transparent;
+  background: var(--tb-bg);
   border-color: var(--tb-line-strong);
-  color: var(--tb-primary-text);
+  color: var(--tb-text);
   &:hover:not(:disabled) {
-    background: var(--tb-primary-hover-tint);
+    border-color: var(--tb-text-muted);
   }
   &:disabled {
     color: var(--tb-text-muted);
@@ -167,25 +223,26 @@
   }
 }
 @utility btn-danger {
-  background: transparent;
+  background: var(--tb-bg);
   border-color: var(--tb-line-strong);
   color: var(--tb-danger);
   &:hover:not(:disabled) {
     background: var(--tb-danger-weak);
+    border-color: var(--tb-danger-weak);
   }
   &:disabled {
     color: var(--tb-text-muted);
   }
 }
 
-/* Status chip: a colour and always a word (colour is never the only signal). */
+/* Status chip: a soft pill with a colour and always a word (colour is never the only signal). */
 @utility chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 22px;
-  padding: 0 8px;
-  border-radius: var(--tb-radius-sm);
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.33;
@@ -210,27 +267,69 @@
   color: var(--tb-danger);
 }
 
-/* A form control: 36px tall, 1px border, blue border on focus. */
+/* A form control: 40px tall, rounded, darker border on hover, accent on focus. */
 @utility field {
-  min-height: 32px;
+  min-height: 40px;
   border: 1px solid var(--tb-line-strong);
   border-radius: var(--tb-radius-sm);
-  padding: 0 8px;
+  padding: 0 12px;
   background: var(--tb-bg);
   color: var(--tb-text);
+  transition: border-color 160ms var(--tb-ease);
   &:hover {
     border-color: var(--tb-text-muted);
   }
 }
 
-/* A white panel on the grey page. */
+/* A white panel on the light page: no border, large radius. */
 @utility panel {
   background: var(--tb-bg);
-  border: 1px solid var(--tb-line);
+  border: 1px solid rgb(23 22 29 / 0.03);
   border-radius: var(--tb-radius);
 }
 
-/* Icon-only round button (refresh, back): 40px target, tinted on hover. */
+/* A key-number tile: pastel gradient, white round icon. The five steps run pink → lavender →
+ * periwinkle, so a row of tiles reads as one band. Text on every step is ≥ 12:1. */
+@utility stat {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px 20px 16px;
+  border-radius: var(--tb-radius-sm);
+  background: linear-gradient(100deg, var(--stat-from), var(--stat-to));
+}
+@utility stat-1 {
+  --stat-from: #f8dce7;
+  --stat-to: #f0dbeb;
+}
+@utility stat-2 {
+  --stat-from: #f0dbeb;
+  --stat-to: #e7daf2;
+}
+@utility stat-3 {
+  --stat-from: #e7daf2;
+  --stat-to: #dfdcf6;
+}
+@utility stat-4 {
+  --stat-from: #dfdcf6;
+  --stat-to: #dce0f8;
+}
+@utility stat-5 {
+  --stat-from: #dce0f8;
+  --stat-to: #e5e8fb;
+}
+@utility stat-icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  background: var(--tb-bg);
+  color: var(--tb-text);
+}
+
+/* Icon-only round button (refresh, back, log out): 40px target, tinted on hover. */
 @utility btn-icon {
   display: inline-flex;
   align-items: center;
@@ -239,31 +338,78 @@
   height: 40px;
   border-radius: 9999px;
   color: var(--tb-text-2);
+  transition: background-color 160ms var(--tb-ease);
   &:hover {
-    background: var(--tb-primary-hover-tint);
-    color: var(--tb-primary-text);
+    background: var(--tb-surface-hover);
+    color: var(--tb-text);
   }
 }
 
-/* Open data table (no box): header row and rows divided by 1px lines, compact rows. */
+/* Segmented pill tabs: a soft track, the selected tab is a white lifted pill. */
+@utility seg {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 9999px;
+  background: var(--tb-surface-hover);
+}
+@utility seg-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  font-weight: 500;
+  color: var(--tb-text-muted);
+  white-space: nowrap;
+  transition:
+    background-color 160ms var(--tb-ease),
+    color 160ms var(--tb-ease),
+    box-shadow 160ms var(--tb-ease);
+  &:hover {
+    color: var(--tb-text);
+  }
+  &[aria-selected="true"] {
+    background: var(--tb-bg);
+    color: var(--tb-text);
+    box-shadow: var(--tb-lift);
+  }
+}
+
+/* A chart bar's empty track: soft diagonal hatching, as in the reference charts. */
+@utility hatch {
+  background-color: var(--tb-surface);
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgb(23 22 29 / 0.035) 0 2px,
+    transparent 2px 7px
+  );
+}
+
+/* Open data table (no box): muted header over a line, airy rows divided by light lines. */
 @utility data-table {
   width: 100%;
   text-align: left;
   border-collapse: collapse;
-  & th {
-    height: 40px;
+  & thead th {
+    height: 44px;
     padding: 0 16px;
-    font-weight: 500;
-    color: var(--tb-text);
+    font-weight: 400;
+    color: var(--tb-text-muted);
     border-bottom: 1px solid var(--tb-line-strong);
     white-space: nowrap;
   }
-  & td {
-    padding: 8px 16px;
-    vertical-align: top;
+  & td,
+  & tbody th {
+    padding: 12px 16px;
+    vertical-align: middle;
     border-bottom: 1px solid var(--tb-line);
   }
+  & tbody tr {
+    transition: background-color 160ms var(--tb-ease);
+  }
   & tbody tr:hover {
-    background: var(--tb-surface);
+    background: var(--tb-bg);
   }
 }

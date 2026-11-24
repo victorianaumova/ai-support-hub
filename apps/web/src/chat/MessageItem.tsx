@@ -101,7 +101,7 @@ export function MessageItem({ message, ticketId }: { message: Message; ticketId:
     return (
       <li className="flex flex-col items-end">
         <Byline label="You" time={time} align="end" />
-        <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-4 py-2 text-white">
+        <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-4 py-3 text-white">
           <span className="sr-only">You: </span>
           <SafeText text={message.body} />
         </div>
@@ -117,10 +117,10 @@ export function MessageItem({ message, ticketId }: { message: Message; ticketId:
   if (message.role === "system") {
     return (
       <li>
-        <div role="note" className="flex gap-3 rounded-lg border border-sky-300 bg-sky-50 p-4 text-sky-950">
+        <div role="note" className="flex gap-3 rounded-2xl bg-sky-50 p-4 text-sky-950">
           <Icon name="support_agent" className="mt-0.5" />
           <div className="min-w-0">
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide">{message.author_label}</p>
+            <p className="mb-1 text-xs font-medium">{message.author_label}</p>
             <SafeText text={message.body} />
           </div>
         </div>
@@ -135,7 +135,7 @@ export function MessageItem({ message, ticketId }: { message: Message; ticketId:
       </span>
       <div className="flex min-w-0 max-w-[85%] flex-col items-start">
         <Byline label={message.author_label} time={time} align="start" />
-        <div className="rounded-2xl rounded-tl-sm border border-line bg-white px-4 py-2">
+        <div className="rounded-2xl rounded-tl-sm bg-surface px-4 py-3">
           <SafeText
             text={message.body}
             renderMarker={(marker, key) => (
@@ -151,7 +151,7 @@ export function MessageItem({ message, ticketId }: { message: Message; ticketId:
                 {sources.map((source) => {
                   const href = helpHref(source.url);
                   return (
-                    <li key={source.marker} className="chip max-w-full border border-line bg-white">
+                    <li key={source.marker} className="chip max-w-full bg-white">
                       <span className="text-muted">[{source.marker}]</span>
                       {href === null ? (
                         <span className="truncate">{source.title}</span>

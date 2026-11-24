@@ -130,7 +130,7 @@ export function ContextTabs({ ticket, focused }: { ticket: Ticket; focused: numb
 
   return (
     <section aria-label="Context" className="panel self-start">
-      <div role="tablist" aria-label="Context" className="flex border-b border-line">
+      <div role="tablist" aria-label="Context" className="seg m-3 w-[calc(100%-1.5rem)]">
         {TABS.map((name) => (
           <button
             key={name}
@@ -140,7 +140,7 @@ export function ContextTabs({ ticket, focused }: { ticket: Ticket; focused: numb
             onClick={() => {
               setTab(name);
             }}
-            className={`-mb-px h-12 flex-1 border-b-2 px-2 font-medium ${current === name ? "border-primary text-primary-text" : "border-transparent text-muted hover:bg-surface-hover hover:text-ink"}`}
+            className="seg-tab min-w-0 flex-1 px-2!"
           >
             {name}
           </button>

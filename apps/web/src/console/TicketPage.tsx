@@ -89,12 +89,12 @@ export function TicketPage() {
   );
 
   return (
-    <div className="px-4 py-4 sm:px-6">
+    <div className="px-4 py-5 sm:px-8 md:py-8 lg:px-10">
       <div className="flex min-h-12 flex-wrap items-center gap-3">
         <Link to="/console" aria-label="Back to the queue" className="btn-icon -ml-2">
           <Icon name="arrow_back" />
         </Link>
-        <h1 className="text-[1.375rem] font-normal">
+        <h1 className="page-title">
           {data.customer.display_name} · {words(data.intent)}
         </h1>
         <span className="chip chip-info capitalize">{words(data.status)}</span>

@@ -46,8 +46,8 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="max-w-3xl px-4 py-4 sm:px-6">
-      <h1 className="flex h-12 items-center text-[1.375rem] font-normal">Settings</h1>
+    <div className="max-w-3xl px-4 py-5 sm:px-8 md:py-8 lg:px-10">
+      <h1 className="flex h-12 items-center page-title">Settings</h1>
       <p className="mt-1 text-sm text-muted">Changes count from the next ticket. Each change is written to the audit log with your reason.</p>
 
       <section className="mt-6 panel p-4">
