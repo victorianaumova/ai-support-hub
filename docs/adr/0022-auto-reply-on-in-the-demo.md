@@ -1,6 +1,6 @@
 # ADR-0022: Auto-reply on in the demo before the milestone run
 
-- Status: accepted
+- Status: accepted; decision 3 (the condition) superseded by [ADR-0023](0023-auto-reply-on-after-missed-red-lines.md)
 - Date: 2026-11-24
 - Supersedes: the "auto-reply stays off in the demo" part of [ADR-0019](0019-scope-cuts.md) (decision 1, P9-03; first consequence), and the precondition in the [evaluation plan](../eval-plan.md) §1 and §2 and the [PRD](../prd.md) (NFR-4, rollout stages) that auto-reply stays off until the milestone run (P12-00) passes the red lines. Owner decision on PR #68.
 

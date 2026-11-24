@@ -26,5 +26,6 @@ One file per decision. To change a decision, add a new ADR that replaces the old
 | [0020](0020-exact-error-code-lookup.md) | Exact error-code lookup in hybrid search (adds to 0005) |
 | [0021](0021-restore-run-tracing.md) | Run tracing with Langfuse is back, P9-01 only (amends 0019, restores the tracing part of 0014) |
 | [0022](0022-auto-reply-on-in-the-demo.md) | Auto-reply on in the demo before the milestone run (replaces part of 0019) |
+| [0023](0023-auto-reply-on-after-missed-red-lines.md) | Auto-reply on in the demo after missed red lines (replaces the condition of 0022) |
 
 Template: Context → Decision → Alternatives considered → Consequences. Half a page.

@@ -112,7 +112,7 @@ Priority: **M** must, **S** should, **C** could, **W** won't (this version).
 
 ## 7. Non-functional requirements
 
-Every number has a reason. "Target" is the goal for the MVP. "Red line" means: below this, auto-reply stays off.
+Every number has a reason. "Target" is the goal for the MVP. "Red line" means: below this, auto-reply stays off (the cloud demo is the one exception, after P12-00: [ADR-0023](adr/0023-auto-reply-on-after-missed-red-lines.md)).
 
 **Budget mode ([ADR-0018](adr/0018-budget-mode.md)).** NFR-4, NFR-5 and NFR-7 are measured on a small evaluation set (20 tickets, 16 attacks) and counted in tickets, not percentages. **These numbers are a demo check, not a proof.** Passing them shows that the demo works and that nothing broke badly. It does not show that the real error rate meets the target: 0 errors in 20 tickets still allows up to 16% (95% interval). The percentages in the "Reason" column say what a real rollout would have to prove (section 12).
 
