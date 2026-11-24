@@ -201,8 +201,42 @@ def test_a_second_ticket_of_the_customer_has_the_first_ones_summary_in_context(
 
     assert [item["summary"] for item in detail["memory"]] == [SUMMARY]
     assert detail["memory"][0]["ticket_id"] == str(first)
+    # "Why you see this ticket" (P12): the repeat contact and the closed ticket it repeats
+    assert detail["review"]["rules"] == ["memory_shows_open_case"]
+    [repeat] = detail["review"]["repeat_of"]
+    assert (repeat["id"], repeat["intent"], repeat["status"]) == (
+        str(first),
+        "withdrawal_issue",
+        "closed",
+    )
     intake_details = _one(fresh, "SELECT details FROM audit_log WHERE action = 'intake.done'")[0]
     assert (intake_details["memory_items"], intake_details["open_tickets"]) == (1, 0)
+
+
+def test_the_console_links_the_open_ticket_a_repeat_contact_repeats(
+    fresh: Urls, qdrant_url: str
+) -> None:
+    """P12: a draft sent to approval because the customer has another open ticket on the same
+    intent names the rule and links that ticket with its intent and status. A ticket created
+    after the run, or on another intent, is not linked; a ticket without `policy_review` has
+    no review."""
+    customer_id = add_customer(fresh)
+    first = _answered_ticket(fresh, customer_id, "My SEPA withdrawal of 200 EUR is missing.")
+    _answered_ticket(fresh, customer_id, "What does a card payment abroad cost?", intent="fees_fx")
+    with _web(fresh, qdrant_url, MemoryAnswers([])) as web:
+        second, _ = _post(_customer(web), SEPA)
+        later = _answered_ticket(fresh, customer_id, "Still no SEPA withdrawal.")
+        operator = _login(web)
+        detail = _detail(operator, second)
+        first_detail = _detail(operator, first)
+
+    assert detail["route_reasons"] == ["policy_review"]
+    assert detail["review"]["rules"] == ["memory_shows_open_case"]
+    assert [(t["id"], t["intent"], t["status"]) for t in detail["review"]["repeat_of"]] == [
+        (str(first), "withdrawal_issue", "answered")
+    ]
+    assert str(later) not in json.dumps(detail["review"])
+    assert first_detail["review"] is None
 
 
 def test_the_summary_is_recorded_masked_and_never_holds_card_data(

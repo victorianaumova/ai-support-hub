@@ -59,7 +59,7 @@ Three columns on desktop, stacked on mobile.
 **Left — conversation.** All messages with labels and times; masked parts shown as they are stored.
 
 **Middle — work area.**
-- *Why you see this ticket:* route, reason chips with plain explanations (for example "Low confidence: 0.71, threshold 0.85", "Policy: dispute tickets always need a human"), AI summary.
+- *Why you see this ticket:* route, reason chips with plain explanations (for example "Low confidence: 0.71, threshold 0.85", "Policy: dispute tickets always need a human"), AI summary. For `policy_review` (row 6, `approval_only`) a "Reviewed because" list names the rules that matched: topic always reviewed (`intent`), high urgency, the draft proposes an action, repeat contact (`memory_shows_open_case`); a repeat contact links the earlier tickets on the same topic with intent, status and date (P12, `review` in the ticket detail).
 - *Draft* (when present): editable text area with the AI text; citation markers are kept as chips; unsupported claims from the verify step are underlined with a tooltip; groundedness and confidence numbers.
 - *Proposed actions:* for example a prepared Jira issue (type, summary, description) with a checkbox "Create on send".
 - Buttons: **Approve and send** (disabled after any edit), **Send edited**, **Reject** (reason required: wrong facts / wrong tone / missing information / policy / other; optional own reply), **Claim / Release**, **Close ticket**.

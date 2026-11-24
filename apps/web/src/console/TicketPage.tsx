@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { ApiError, describe } from "../api/problem";
 import { useOperator } from "../auth/session";
 import { ErrorState } from "../components/ErrorState";
@@ -8,7 +8,7 @@ import { SafeText } from "../text/SafeText";
 import { ContextTabs } from "./ContextTabs";
 import { DraftEditor } from "./DraftEditor";
 import { shortcut } from "./keys";
-import { reasonText, words } from "./labels";
+import { reasonText, reviewRuleText, words } from "./labels";
 import { neighbour } from "./queue";
 import { isUrgent } from "./sla";
 import { type Ticket, useTicket } from "./useTicket";
@@ -147,6 +147,34 @@ export function TicketPage() {
                 </li>
               ))}
             </ul>
+            {data.review && (
+              <div className="mt-2 text-sm">
+                <p className="font-medium">Reviewed because</p>
+                {data.review.rules.length === 0 ? (
+                  <p className="text-muted">The matching rule is not recorded for this ticket.</p>
+                ) : (
+                  <ul className="list-disc pl-5">
+                    {data.review.rules.map((rule) => (
+                      <li key={rule}>{reviewRuleText(rule)}</li>
+                    ))}
+                  </ul>
+                )}
+                {data.review.repeat_of.length > 0 && (
+                  <>
+                    <p className="mt-1">Earlier tickets on this topic:</p>
+                    <ul className="list-disc pl-5">
+                      {data.review.repeat_of.map((other) => (
+                        <li key={other.id}>
+                          <Link to={`/console/tickets/${other.id}`} className="text-brand-700 underline">
+                            {words(other.intent)} · {words(other.status)} · {new Date(other.created_at).toLocaleDateString()}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+            )}
             {data.summary && (
               <div className="mt-2 text-sm">
                 <p className="font-medium">AI summary</p>

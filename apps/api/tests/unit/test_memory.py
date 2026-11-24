@@ -16,6 +16,7 @@ from hub.domain.memory import (
     MemoryItem,
     MemorySummary,
     OpenTicket,
+    repeat_contacts,
     shows_open_case,
 )
 from hub.domain.triage import TriageResult
@@ -66,6 +67,25 @@ def test_a_repeat_contact_on_the_same_intent_shows_an_open_case(
     """ai-pipeline §9: another open ticket with the same intent, or a memory item of the last
     14 days on it."""
     assert shows_open_case(context, Intent.WITHDRAWAL_ISSUE, NOW) is expected
+
+
+def test_the_repeat_contacts_are_the_open_tickets_then_the_memory_tickets_once_each() -> None:
+    """P12: the console links them under "Why you see this ticket"."""
+    shared = _open(Intent.WITHDRAWAL_ISSUE)
+    recent = _item(Intent.WITHDRAWAL_ISSUE, timedelta(days=2)).model_copy(
+        update={"ticket_id": shared.ticket_id}
+    )
+    other = _item(Intent.WITHDRAWAL_ISSUE, timedelta(days=1))
+    context = CustomerContext(
+        open_tickets=[_open(Intent.FEES_FX), shared],
+        memory=[recent, other, _item(Intent.WITHDRAWAL_ISSUE, REPEAT_WINDOW * 2)],
+    )
+    assert repeat_contacts(context, Intent.WITHDRAWAL_ISSUE, NOW) == [
+        shared.ticket_id,
+        other.ticket_id,
+    ]
+    assert repeat_contacts(context, None, NOW) == []
+    assert repeat_contacts(None, Intent.WITHDRAWAL_ISSUE, NOW) == []
 
 
 def _triage(intent: str) -> TriageResult:
