@@ -1,22 +1,226 @@
 @import "tailwindcss";
 
-/* Calm, high-contrast palette (UI: WCAG AA). Colour is never the only signal. */
+/* Design tokens (UI §7). A calm, dense admin-console look: white and light grey surfaces, one
+ * blue, a grey text scale, 1px borders instead of shadows, an 8px grid and an 8px radius.
+ * Every text/background pair below meets WCAG AA (4.5:1); colour is never the only signal. */
+:root {
+  --tb-bg: #ffffff;
+  --tb-surface: #f8f9fa;
+  --tb-surface-hover: #f1f3f4;
+  --tb-line: #dadce0;
+  --tb-line-strong: #bdc1c6;
+
+  --tb-text: #202124;
+  --tb-text-2: #3c4043;
+  --tb-text-muted: #5f6368; /* 5.7:1 on --tb-surface */
+
+  --tb-primary: #1a73e8; /* fills; white text on it is 4.5:1 */
+  --tb-primary-hover: #1765cc;
+  --tb-primary-text: #1967d2; /* links and blue text on white or grey */
+  --tb-primary-weak: #e8f0fe;
+  --tb-primary-strong: #174ea6; /* blue text on --tb-primary-weak */
+
+  --tb-ok: #0d652d;
+  --tb-ok-weak: #e6f4ea;
+  --tb-warn: #7a4100;
+  --tb-warn-weak: #fef7e0;
+  --tb-warn-line: #f9cb6b;
+  --tb-danger: #a50e0e;
+  --tb-danger-fill: #c5221f;
+  --tb-danger-weak: #fce8e6;
+  --tb-info: #174ea6;
+  --tb-info-weak: #e8f0fe;
+
+  --tb-space: 8px; /* the grid: use Tailwind steps 2, 4, 6, 8 … (multiples of 8px; 1 = 4px for tight insides) */
+  --tb-radius: 8px;
+  --tb-radius-sm: 4px;
+  --tb-row-height: 48px;
+}
+
 @theme {
-  --color-brand-50: oklch(0.97 0.02 250);
-  --color-brand-600: oklch(0.48 0.13 250);
-  --color-brand-700: oklch(0.42 0.13 250);
-  --color-ink: oklch(0.22 0.02 250);
-  --color-muted: oklch(0.45 0.02 250);
+  --font-sans: "Roboto Variable", Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius-sm: var(--tb-radius-sm);
+  --radius: var(--tb-radius-sm);
+  --radius-md: var(--tb-radius);
+  --radius-lg: var(--tb-radius);
+
+  /* Semantic colours (prefer these in new code: bg-surface, border-line, text-muted …). */
+  --color-surface: var(--tb-surface);
+  --color-surface-hover: var(--tb-surface-hover);
+  --color-line: var(--tb-line);
+  --color-ink: var(--tb-text);
+  --color-muted: var(--tb-text-muted);
+  --color-primary: var(--tb-primary);
+  --color-primary-text: var(--tb-primary-text);
+  --color-primary-weak: var(--tb-primary-weak);
+
+  /* The older palette classes follow the tokens, so every page shares one look. */
+  --color-brand-50: var(--tb-primary-weak);
+  --color-brand-600: var(--tb-primary);
+  --color-brand-700: var(--tb-primary-text);
+
+  --color-slate-50: var(--tb-surface);
+  --color-slate-100: var(--tb-surface-hover);
+  --color-slate-200: var(--tb-line);
+  --color-slate-300: var(--tb-line-strong);
+  --color-slate-800: var(--tb-text-2);
+  --color-slate-900: var(--tb-text);
+
+  --color-red-50: var(--tb-danger-weak);
+  --color-red-100: var(--tb-danger-weak);
+  --color-red-200: #f6aea9;
+  --color-red-300: #f28b82;
+  --color-red-400: #ee675c;
+  --color-red-700: var(--tb-danger-fill);
+  --color-red-800: var(--tb-danger);
+  --color-red-900: var(--tb-danger);
+
+  --color-amber-50: var(--tb-warn-weak);
+  --color-amber-100: var(--tb-warn-weak);
+  --color-amber-200: #feefc3;
+  --color-amber-300: var(--tb-warn-line);
+  --color-amber-400: var(--tb-warn-line);
+  --color-amber-900: var(--tb-warn);
+  --color-amber-950: var(--tb-warn);
+
+  --color-sky-50: var(--tb-info-weak);
+  --color-sky-300: #aecbfa;
+  --color-sky-950: var(--tb-info);
+
+  --color-emerald-50: var(--tb-ok-weak);
+  --color-emerald-100: var(--tb-ok-weak);
+  --color-emerald-800: var(--tb-ok);
+  --color-emerald-950: var(--tb-ok);
+
+  /* No drop shadows: surfaces are separated by 1px borders. */
+  --shadow-sm: 0 0 0 1px var(--tb-line);
 }
 
 @layer base {
   html {
-    color: var(--color-ink);
-    background: oklch(0.985 0.003 250);
+    color: var(--tb-text);
+    background: var(--tb-bg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    font-size: 0.875rem; /* 14px: the dense console size */
+    line-height: 1.43;
   }
   /* Visible focus everywhere (UI: keyboard reachable, visible focus). */
   :focus-visible {
-    outline: 3px solid var(--color-brand-600);
+    outline: 2px solid var(--tb-primary);
     outline-offset: 2px;
   }
+  input,
+  select,
+  textarea {
+    background: var(--tb-bg);
+  }
+}
+
+/* Buttons: one primary per area, the rest secondary or quiet. */
+@utility btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: var(--tb-radius);
+  border: 1px solid transparent;
+  font-weight: 500;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  cursor: pointer;
+  &:disabled {
+    cursor: not-allowed;
+  }
+}
+@utility btn-primary {
+  background: var(--tb-primary);
+  color: #ffffff;
+  &:hover:not(:disabled) {
+    background: var(--tb-primary-hover);
+  }
+  &:disabled {
+    background: var(--tb-surface-hover);
+    color: var(--tb-text-muted);
+  }
+}
+@utility btn-secondary {
+  background: var(--tb-bg);
+  border-color: var(--tb-line);
+  color: var(--tb-primary-text);
+  &:hover:not(:disabled) {
+    background: var(--tb-primary-weak);
+    border-color: var(--tb-primary-weak);
+  }
+  &:disabled {
+    color: var(--tb-text-muted);
+    background: var(--tb-surface);
+  }
+}
+@utility btn-danger {
+  background: var(--tb-bg);
+  border-color: var(--tb-line);
+  color: var(--tb-danger);
+  &:hover:not(:disabled) {
+    background: var(--tb-danger-weak);
+  }
+  &:disabled {
+    color: var(--tb-text-muted);
+  }
+}
+
+/* Status chip: a colour and always a word (colour is never the only signal). */
+@utility chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.33;
+  white-space: nowrap;
+  background: var(--tb-surface-hover);
+  color: var(--tb-text-2);
+}
+@utility chip-info {
+  background: var(--tb-info-weak);
+  color: var(--tb-info);
+}
+@utility chip-ok {
+  background: var(--tb-ok-weak);
+  color: var(--tb-ok);
+}
+@utility chip-warn {
+  background: var(--tb-warn-weak);
+  color: var(--tb-warn);
+}
+@utility chip-danger {
+  background: var(--tb-danger-weak);
+  color: var(--tb-danger);
+}
+
+/* A form control: 36px tall, 1px border, blue border on focus. */
+@utility field {
+  min-height: 36px;
+  border: 1px solid var(--tb-line-strong);
+  border-radius: var(--tb-radius-sm);
+  padding: 0 8px;
+  background: var(--tb-bg);
+  color: var(--tb-text);
+  &:hover {
+    border-color: var(--tb-text-muted);
+  }
+}
+
+/* A white panel on the grey page. */
+@utility panel {
+  background: var(--tb-bg);
+  border: 1px solid var(--tb-line);
+  border-radius: var(--tb-radius);
 }

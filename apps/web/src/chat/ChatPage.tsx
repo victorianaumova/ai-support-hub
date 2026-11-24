@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { describe as describeError } from "../api/problem";
+import { Icon } from "../components/Icon";
 import { Composer } from "./Composer";
 import { MessageItem } from "./MessageItem";
 import { Picker } from "./Picker";
@@ -75,7 +76,7 @@ function Chat({ profile, suggestions, onSwitch }: { profile: Profile; suggestion
     return (
       <div className="mx-auto max-w-xl p-6" role="alert">
         <p>Your demo session has ended.</p>
-        <button type="button" onClick={onSwitch} className="mt-3 rounded-md bg-brand-600 px-4 py-2 text-white">
+        <button type="button" onClick={onSwitch} className="btn btn-primary mt-3">
           Choose a customer again
         </button>
       </div>
@@ -83,23 +84,29 @@ function Chat({ profile, suggestions, onSwitch }: { profile: Profile; suggestion
   }
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-4 px-2 py-4 sm:px-4 lg:grid-cols-[16rem_1fr]">
+    <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 lg:grid-cols-[16rem_1fr]">
       <aside aria-label="Earlier conversations" className="order-2 lg:order-1">
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
+        <div className="panel flex items-start gap-3 p-4">
+          <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-hover text-muted">
+            <Icon name="person" />
+          </span>
+          <div className="min-w-0">
           <p className="font-medium">{profile.display_name}</p>
-          <p className="text-sm capitalize text-muted">{profile.tier} customer</p>
-          <button type="button" onClick={onSwitch} className="mt-2 text-sm text-brand-700 underline">
+          <p className="capitalize text-muted">{profile.tier} customer</p>
+          <button type="button" onClick={onSwitch} className="mt-1 text-primary-text hover:underline">
             Switch customer
           </button>
+          </div>
         </div>
-        <h2 className="mt-4 text-sm font-semibold">Earlier conversations</h2>
+        <h2 className="mt-6 px-1 text-xs font-medium uppercase tracking-wide text-muted">Earlier conversations</h2>
         <button
           type="button"
           onClick={() => {
             open(null);
           }}
-          className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100"
+          className="btn btn-secondary mt-2 w-full"
         >
+          <Icon name="add" size={18} />
           New conversation
         </button>
         <ul className="mt-2 space-y-1">
@@ -111,22 +118,22 @@ function Chat({ profile, suggestions, onSwitch }: { profile: Profile; suggestion
                 onClick={() => {
                   open(ticket.id);
                 }}
-                className={`w-full rounded-md px-3 py-1.5 text-left text-sm hover:bg-slate-100 ${ticket.id === state.ticketId ? "bg-brand-50 font-semibold" : ""}`}
+                className={`w-full rounded-md px-3 py-2 text-left hover:bg-surface-hover ${ticket.id === state.ticketId ? "bg-primary-weak font-medium text-[var(--tb-primary-strong)] hover:bg-primary-weak" : ""}`}
               >
                 {new Date(ticket.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
-                <span className="block text-xs text-muted">{ticket.status.replace("_", " ")}</span>
+                <span className="block text-xs font-normal text-muted">{ticket.status.replace("_", " ")}</span>
               </button>
             </li>
           ))}
         </ul>
       </aside>
 
-      <section aria-label="Support chat" className="order-1 flex min-h-[70dvh] flex-col overflow-hidden rounded-lg border border-slate-200 bg-slate-50 lg:order-2">
-        <header className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-white p-3">
-          <p className="flex-1 text-sm">
-            <span aria-hidden="true">🤖 </span>
-            {AI_NOTICE}
-          </p>
+      <section aria-label="Support chat" className="panel order-1 flex min-h-[70dvh] flex-col overflow-hidden lg:order-2">
+        <header className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
+          <span aria-hidden="true" className="flex size-8 items-center justify-center rounded-full bg-primary-weak text-[var(--tb-primary-strong)]">
+            <Icon name="support_agent" size={18} />
+          </span>
+          <h2 className="flex-1 text-base font-medium">Tallybridge support</h2>
           <button
             type="button"
             disabled={state.ticketId === null || waiting || state.status === "closed"}
@@ -137,16 +144,24 @@ function Chat({ profile, suggestions, onSwitch }: { profile: Profile; suggestion
                 setHumanError(error);
               });
             }}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-slate-100 disabled:opacity-60"
+            className="btn btn-secondary"
           >
+            <Icon name="person" size={18} />
             Talk to a human
           </button>
         </header>
+        <p className="flex items-start gap-2 border-b border-line bg-sky-50 px-4 py-2 text-xs text-sky-950">
+          <Icon name="info" size={16} />
+          <span>{AI_NOTICE}</span>
+        </p>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto bg-surface p-4 sm:p-6">
           {state.messages.length === 0 && !streaming && (
-            <div className="text-center text-muted">
-              <p>How can we help you today?</p>
+            <div className="py-8 text-center text-muted">
+              <span aria-hidden="true" className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary-weak text-[var(--tb-primary-strong)]">
+                <Icon name="chat" size={24} />
+              </span>
+              <p className="mt-3 text-base text-ink">How can we help you today?</p>
               {suggestions.length > 0 && (
                 <ul aria-label="Suggested questions" className="mt-4 flex flex-wrap justify-center gap-2">
                   {suggestions.map((text) => (
@@ -154,7 +169,7 @@ function Chat({ profile, suggestions, onSwitch }: { profile: Profile; suggestion
                       <button
                         type="button"
                         onClick={() => void send(text)}
-                        className="rounded-full border border-brand-600 bg-white px-3 py-1.5 text-left text-sm text-brand-700 hover:bg-brand-50"
+                        className="rounded-full border border-line bg-white px-4 py-2 text-left text-primary-text hover:border-primary-weak hover:bg-primary-weak"
                       >
                         {text}
                       </button>
@@ -171,53 +186,57 @@ function Chat({ profile, suggestions, onSwitch }: { profile: Profile; suggestion
           </ol>
 
           {state.phase.kind === "streaming" && (
-            <p role="status" className="mt-4 flex items-center gap-2 text-sm text-muted">
-              <span aria-hidden="true" className="size-3 animate-pulse rounded-full bg-brand-600" />
+            <p role="status" className="mt-4 ml-11 flex items-center gap-2 text-muted">
+              <span aria-hidden="true" className="size-2.5 animate-pulse rounded-full bg-primary" />
               {state.phase.step === null ? "Sending…" : STEPS[state.phase.step]}
             </p>
           )}
           {state.assistantDown && (
-            <p role="alert" className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+            <p role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950">
+              <Icon name="warning" size={18} />
               Our assistant is not available now; a human will answer.
             </p>
           )}
           {!streaming && state.status === "pending_approval" && (
-            <p role="status" className="mt-4 rounded-md bg-white p-3 text-sm text-muted">
+            <p role="status" className="mt-4 flex items-start gap-3 rounded-lg border border-sky-300 bg-sky-50 p-4 text-sky-950">
+              <Icon name="hourglass_top" />
               A support specialist is checking the answer before it is sent. It will appear here.
             </p>
           )}
           {!streaming && state.status === "handed_off" && !state.assistantDown && (
-            <p role="status" className="mt-4 rounded-md bg-white p-3 text-sm text-muted">
+            <p role="status" className="mt-4 flex items-start gap-3 rounded-lg border border-sky-300 bg-sky-50 p-4 text-sky-950">
+              <Icon name="hourglass_top" />
               Waiting for a support specialist. Their reply will appear here.
             </p>
           )}
           {state.status === "closed" && (
-            <p role="status" className="mt-4 rounded-md bg-white p-3 text-sm text-muted">
+            <p role="status" className="mt-4 flex items-start gap-3 rounded-lg border border-line bg-white p-4 text-muted">
+              <Icon name="check_circle" />
               This conversation is closed. A new message starts a new conversation.
             </p>
           )}
           {state.phase.kind === "rate_limited" && (
-            <p role="alert" className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+            <p role="alert" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950">
               You are sending messages too quickly.{" "}
               {state.phase.retryAfterS !== null ? `Please try again in ${Math.ceil(state.phase.retryAfterS)} seconds.` : "Please try again in a minute."}
             </p>
           )}
           {state.phase.kind === "failed" && (
-            <div role="alert" className="mt-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+            <div role="alert" className="mt-4 rounded-lg border border-red-300 bg-red-50 p-3 text-red-900">
               <p>Your message could not be sent. {describeError(state.phase.error)}</p>
               <button
                 type="button"
                 onClick={() => {
                   if (state.phase.kind === "failed") void send(state.phase.text);
                 }}
-                className="mt-2 rounded border border-red-400 bg-white px-3 py-1"
+                className="btn btn-danger mt-2"
               >
                 Try again
               </button>
             </div>
           )}
           {(pollError ?? humanError) !== null && (pollError ?? humanError) !== undefined && (
-            <p role="alert" className="mt-4 text-sm text-red-900">
+            <p role="alert" className="mt-4 text-red-900">
               {describeError(pollError ?? humanError)}
             </p>
           )}

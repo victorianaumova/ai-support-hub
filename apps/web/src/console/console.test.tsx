@@ -109,7 +109,7 @@ describe("queue", () => {
     expect(link).toHaveAttribute("href", "/console/tickets/t1");
     const row = link.closest("tr");
     expect(row).not.toBeNull();
-    expect(within(row as HTMLElement).getByText("⚑ Urgent")).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByText("Urgent")).toBeInTheDocument();
     expect(within(row as HTMLElement).getByText("over SLA")).toBeInTheDocument();
     expect(within(row as HTMLElement).getByText("SEPA withdrawal not arrived.")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /Needs approval/ })).toHaveTextContent("1");

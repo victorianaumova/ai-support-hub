@@ -58,7 +58,7 @@ function CustomerTab({ ticket }: { ticket: Ticket }) {
       {account.isError && <p role="alert" className="text-red-900">The account data could not be loaded, so limits, cards and transactions are unknown.</p>}
       {data !== undefined && (
         <>
-          <h3 className="font-semibold">Limits used</h3>
+          <h3 className="font-medium">Limits used</h3>
           {data.profile === null ? (
             <Unknown what="limits" />
           ) : (
@@ -78,7 +78,7 @@ function CustomerTab({ ticket }: { ticket: Ticket }) {
               </tbody>
             </table>
           )}
-          <h3 className="font-semibold">Cards</h3>
+          <h3 className="font-medium">Cards</h3>
           {data.cards === null ? (
             <Unknown what="cards" />
           ) : data.cards.length === 0 ? (
@@ -95,7 +95,7 @@ function CustomerTab({ ticket }: { ticket: Ticket }) {
               ))}
             </ul>
           )}
-          <h3 className="font-semibold">Recent transactions</h3>
+          <h3 className="font-medium">Recent transactions</h3>
           {data.transactions === null ? (
             <Unknown what="transactions" />
           ) : data.transactions.length === 0 ? (
@@ -129,8 +129,8 @@ export function ContextTabs({ ticket, focused }: { ticket: Ticket; focused: numb
   const modelCalls = ticket.model_calls ?? [];
 
   return (
-    <section aria-label="Context" className="rounded-lg border border-slate-200 bg-white">
-      <div role="tablist" aria-label="Context" className="flex border-b border-slate-200">
+    <section aria-label="Context" className="panel self-start">
+      <div role="tablist" aria-label="Context" className="flex border-b border-line">
         {TABS.map((name) => (
           <button
             key={name}
@@ -140,13 +140,13 @@ export function ContextTabs({ ticket, focused }: { ticket: Ticket; focused: numb
             onClick={() => {
               setTab(name);
             }}
-            className={`flex-1 px-2 py-2 text-sm ${current === name ? "border-b-2 border-brand-600 font-semibold" : "text-muted"}`}
+            className={`-mb-px h-12 flex-1 border-b-2 px-2 font-medium ${current === name ? "border-primary text-primary-text" : "border-transparent text-muted hover:bg-surface-hover hover:text-ink"}`}
           >
             {name}
           </button>
         ))}
       </div>
-      <div role="tabpanel" className="max-h-[70dvh] space-y-3 overflow-y-auto p-3 text-sm">
+      <div role="tabpanel" className="max-h-[70dvh] space-y-3 overflow-y-auto p-4">
         {current === "Sources" && (
           <>
             {chunks.length === 0 && parts.facts.length === 0 && <p className="text-muted">No sources for this ticket.</p>}
@@ -158,11 +158,11 @@ export function ContextTabs({ ticket, focused }: { ticket: Ticket; focused: numb
                 <article
                   key={chunk.chunk_id}
                   id={marker !== undefined ? `source-${marker}` : undefined}
-                  className={`rounded-md border p-2 ${marker !== undefined ? "border-brand-600 bg-brand-50" : "border-slate-200"} ${marker === focused ? "ring-2 ring-brand-600" : ""}`}
+                  className={`rounded-md border p-2 ${marker !== undefined ? "border-sky-300 bg-sky-50" : "border-line"} ${marker === focused ? "ring-2 ring-primary" : ""}`}
                 >
                   <p className="font-medium">
-                    {marker !== undefined && <span className="mr-1 rounded-full bg-brand-600 px-1.5 text-xs text-white">{marker}</span>}
-                    {href ? <Link to={href} target="_blank" rel="noopener noreferrer" className="underline">{chunk.title}</Link> : chunk.title}
+                    {marker !== undefined && <span className="mr-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs text-white">{marker}</span>}
+                    {href ? <Link to={href} target="_blank" rel="noopener noreferrer" className="text-primary-text hover:underline">{chunk.title}</Link> : chunk.title}
                   </p>
                   <p className="text-xs text-muted">
                     {chunk.section} · score {chunk.score.toFixed(3)} · rank {chunk.rank}
@@ -173,11 +173,11 @@ export function ContextTabs({ ticket, focused }: { ticket: Ticket; focused: numb
                 </article>
               );
             })}
-            {parts.facts.length > 0 && <h3 className="font-semibold">Account facts</h3>}
+            {parts.facts.length > 0 && <h3 className="font-medium">Account facts</h3>}
             {parts.facts.map((fact) => {
               const marker = cited.get(fact.fact_id);
               return (
-                <article key={fact.fact_id} id={marker !== undefined ? `source-${marker}` : undefined} className={`rounded-md border p-2 ${marker !== undefined && marker === focused ? "ring-2 ring-brand-600" : "border-slate-200"}`}>
+                <article key={fact.fact_id} id={marker !== undefined ? `source-${marker}` : undefined} className={`rounded-md border p-2 ${marker !== undefined && marker === focused ? "ring-2 ring-primary" : "border-line"}`}>
                   <p className="text-xs text-muted">
                     {fact.fact_id} · from {fact.source_tool}
                   </p>
@@ -193,8 +193,8 @@ export function ContextTabs({ ticket, focused }: { ticket: Ticket; focused: numb
             {memory.length === 0 && <p className="text-muted">No earlier tickets in memory.</p>}
             <ul className="space-y-2">
               {memory.map((item) => (
-                <li key={item.ticket_id} className="rounded-md border border-slate-200 p-2">
-                  <Link to={`/console/tickets/${item.ticket_id}`} className="font-medium text-brand-700 underline">
+                <li key={item.ticket_id} className="rounded-md border border-line p-2">
+                  <Link to={`/console/tickets/${item.ticket_id}`} className="font-medium text-primary-text hover:underline">
                     {words(item.intent)} · {new Date(item.created_at).toLocaleDateString()}
                   </Link>
                   <SafeText text={item.summary} />
@@ -224,7 +224,7 @@ export function ContextTabs({ ticket, focused }: { ticket: Ticket; focused: numb
                 <dt className="text-muted">Trace</dt>
                 <dd>
                   {ticket.trace_url ? (
-                    <a href={ticket.trace_url} target="_blank" rel="noopener noreferrer" className="text-brand-700 underline">
+                    <a href={ticket.trace_url} target="_blank" rel="noopener noreferrer" className="text-primary-text hover:underline">
                       Open in Langfuse
                     </a>
                   ) : run.trace_id ? (
@@ -237,7 +237,7 @@ export function ContextTabs({ ticket, focused }: { ticket: Ticket; focused: numb
             )}
             {run !== null && (
               <>
-                <h3 className="mt-3 font-semibold">Steps</h3>
+                <h3 className="mt-3 font-medium">Steps</h3>
                 {run.steps.length === 0 ? (
                   <p className="text-muted">No steps recorded.</p>
                 ) : (
@@ -251,7 +251,7 @@ export function ContextTabs({ ticket, focused }: { ticket: Ticket; focused: numb
                 )}
               </>
             )}
-            <h3 className="mt-3 font-semibold">Model calls</h3>
+            <h3 className="mt-3 font-medium">Model calls</h3>
             {modelCalls.length === 0 ? (
               <p className="text-muted">None.</p>
             ) : (
@@ -264,7 +264,7 @@ export function ContextTabs({ ticket, focused }: { ticket: Ticket; focused: numb
                 ))}
               </ul>
             )}
-            <h3 className="mt-3 font-semibold">Tool calls</h3>
+            <h3 className="mt-3 font-medium">Tool calls</h3>
             {toolCalls.length === 0 ? (
               <p className="text-muted">None.</p>
             ) : (

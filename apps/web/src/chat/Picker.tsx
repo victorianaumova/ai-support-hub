@@ -39,14 +39,14 @@ export function Picker({ onChosen }: { onChosen: (profile: Profile, customer: De
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-semibold">Try the support chat</h1>
+      <h1 className="text-2xl font-normal">Try the support chat</h1>
       <p className="mt-2 text-muted">
         In the real Tallybridge app you would already be logged in. Here you pick a demo customer instead — every
         customer and transaction is made up.
       </p>
       <form onSubmit={submit} className="mt-6 flex flex-wrap items-end gap-3" noValidate>
         <div>
-          <label htmlFor="access-code" className="block text-sm font-medium">
+          <label htmlFor="access-code" className="block font-medium">
             Access code
           </label>
           <input
@@ -58,13 +58,13 @@ export function Picker({ onChosen }: { onChosen: (profile: Profile, customer: De
             onChange={(event) => {
               setCode(event.target.value);
             }}
-            className="mt-1 w-64 max-w-full rounded-md border border-slate-300 px-3 py-2"
+            className="field mt-1 w-64 max-w-full px-3"
           />
         </div>
         <button
           type="submit"
           disabled={code === "" || customers.isPending}
-          className="rounded-md bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="btn btn-primary"
         >
           {customers.isPending ? "Checking…" : "Continue"}
         </button>
@@ -76,7 +76,7 @@ export function Picker({ onChosen }: { onChosen: (profile: Profile, customer: De
       )}
       {customers.data && (
         <section aria-labelledby="pick-heading" className="mt-8">
-          <h2 id="pick-heading" className="text-lg font-semibold">
+          <h2 id="pick-heading" className="text-lg font-medium">
             Choose a customer
           </h2>
           <ul className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -88,11 +88,11 @@ export function Picker({ onChosen }: { onChosen: (profile: Profile, customer: De
                   onClick={() => {
                     login.mutate(customer);
                   }}
-                  className="w-full rounded-lg border border-slate-200 bg-white p-4 text-left hover:border-brand-600 hover:shadow-sm"
+                  className="panel h-full w-full p-4 text-left hover:border-primary hover:bg-primary-weak/40"
                 >
                   <span className="block font-medium">{customer.display_name}</span>
-                  <span className="block text-sm text-muted capitalize">{customer.tier}</span>
-                  <span className="mt-1 block text-sm">{customer.hint}</span>
+                  <span className="chip mt-1 capitalize">{customer.tier}</span>
+                  <span className="mt-2 block text-muted">{customer.hint}</span>
                 </button>
               </li>
             ))}

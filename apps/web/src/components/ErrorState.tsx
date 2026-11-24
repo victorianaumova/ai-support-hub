@@ -11,7 +11,7 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
       </p>
       {requestId !== null && <p className="mt-1 text-sm">Reference: {requestId}</p>}
       {onRetry !== undefined && (
-        <button type="button" onClick={onRetry} className="mt-3 rounded-md border border-red-400 bg-white px-3 py-1.5 text-sm font-medium hover:bg-red-100">
+        <button type="button" onClick={onRetry} className="mt-3 btn btn-danger">
           Try again
         </button>
       )}

@@ -27,7 +27,7 @@ export function usd(value: number | null, digits = 4): string {
 
 function Card({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
+    <div className="panel p-4">
       <p className="text-sm text-muted">{label}</p>
       <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
       {note !== undefined && <p className="mt-1 text-xs text-muted">{note}</p>}
@@ -61,7 +61,7 @@ export function LastEvaluation({ run }: { run: components["schemas"]["EvalSummar
         </thead>
         <tbody>
           {run.checks.map((check) => (
-            <tr key={check.name} className="border-t border-slate-100">
+            <tr key={check.name} className="border-t border-line">
               <th scope="row" className="py-1 pr-2 text-left font-normal">
                 {check.name}
                 {check.judged && <span className="ml-1 text-xs text-muted">(judged)</span>}
@@ -95,18 +95,18 @@ export function DashboardPage() {
   const evals = useQuery({ queryKey: ["console", "evals"], queryFn: async () => unwrap(await api.GET("/api/v1/console/evals/latest")).run });
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
       <div className="flex flex-wrap items-end gap-4">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <h1 className="text-[1.375rem] font-normal">Dashboard</h1>
         <fieldset className="flex flex-wrap items-end gap-2 text-sm">
           <legend className="sr-only">Period</legend>
           <label>
             From
-            <input type="date" value={from} max={to} onChange={(e) => { if (e.target.value) setFrom(e.target.value); }} className="ml-1 rounded border border-slate-300 px-2 py-1" />
+            <input type="date" value={from} max={to} onChange={(e) => { if (e.target.value) setFrom(e.target.value); }} className="ml-1 field" />
           </label>
           <label>
             To
-            <input type="date" value={to} min={from} onChange={(e) => { if (e.target.value) setTo(e.target.value); }} className="ml-1 rounded border border-slate-300 px-2 py-1" />
+            <input type="date" value={to} min={from} onChange={(e) => { if (e.target.value) setTo(e.target.value); }} className="ml-1 field" />
           </label>
         </fieldset>
       </div>
@@ -164,8 +164,8 @@ export function DashboardPage() {
             <BarList
               title="Customer feedback"
               bars={[
-                { label: "👍 Helpful", value: summary.data.feedback.up },
-                { label: "👎 Not helpful", value: summary.data.feedback.down },
+                { label: "Helpful", value: summary.data.feedback.up },
+                { label: "Not helpful", value: summary.data.feedback.down },
               ]}
             />
           </div>
@@ -174,7 +174,7 @@ export function DashboardPage() {
           </p>
         </>
       )}
-      <section aria-labelledby="eval-heading" className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+      <section aria-labelledby="eval-heading" className="mt-6 panel p-4">
         <h2 id="eval-heading" className="font-semibold">
           Last evaluation
         </h2>

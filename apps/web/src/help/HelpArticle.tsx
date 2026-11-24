@@ -36,9 +36,9 @@ export function HelpArticle() {
   }
   const doc = article.data;
   return (
-    <article className="mx-auto max-w-3xl px-4 py-8">
+    <article className="panel mx-4 my-8 max-w-3xl px-6 py-8 sm:mx-auto sm:px-8">
       <p className="text-sm text-muted">Tallybridge help centre</p>
-      <h1 className="mt-1 text-3xl font-semibold">{doc.title}</h1>
+      <h1 className="mt-1 text-3xl font-normal">{doc.title}</h1>
       <p className="mt-1 text-sm text-muted">Updated {new Date(doc.updated_at).toLocaleDateString()}</p>
       {doc.sections.map((section) => (
         <section key={section.anchor} id={section.anchor} tabIndex={-1} className="mt-6 scroll-mt-4 rounded focus:bg-amber-50">

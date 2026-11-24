@@ -12,7 +12,7 @@ export interface Bar {
 export function BarList({ title, bars }: { title: string; bars: Bar[] }) {
   const max = Math.max(1, ...bars.map((b) => b.value));
   return (
-    <figure aria-label={title} className="rounded-lg border border-slate-200 bg-white p-4">
+    <figure aria-label={title} className="panel p-4">
       <figcaption className="font-semibold">{title}</figcaption>
       {bars.length === 0 ? (
         <p className="mt-2 text-sm text-muted">No data in this period.</p>
@@ -50,7 +50,7 @@ export interface Series {
 export function StackedDays({ title, series, points }: { title: string; series: Series[]; points: { date: string; values: Record<string, number | null> }[] }) {
   const max = Math.max(1, ...points.map((p) => series.reduce((sum, s) => sum + (p.values[s.key] ?? 0), 0)));
   return (
-    <figure aria-label={title} className="rounded-lg border border-slate-200 bg-white p-4">
+    <figure aria-label={title} className="panel p-4">
       <figcaption className="font-semibold">{title}</figcaption>
       <ul className="mt-2 flex flex-wrap gap-3 text-xs">
         {series.map((s) => (

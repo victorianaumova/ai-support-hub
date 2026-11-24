@@ -2,7 +2,7 @@
 
 One React app with three areas: customer chat (demo), operator console, lead and compliance pages. Technology: React 19, TypeScript (strict), Vite, React Router, TanStack Query, Tailwind CSS. API types are generated from OpenAPI. No UI component library is required; the builder may use a small headless one (for dialogs, menus) if needed.
 
-Design rules: clean and calm, works at 360 px and up; keyboard reachable; visible focus; colour is never the only signal; WCAG AA contrast. Dates are shown in the browser time zone. All text is English.
+Design rules (look and tokens: §7): clean and calm, works at 360 px and up; keyboard reachable; visible focus; colour is never the only signal; WCAG AA contrast. Dates are shown in the browser time zone. All text is English.
 
 ## 1. Routes
 
@@ -95,3 +95,27 @@ Table with filters (entity, actor, action, time), a detail drawer with the JSON,
 - Accessibility check with axe in the e2e run on the main pages.
 
 As built (P10-05, `apps/web/e2e/`): the scenarios run in order on one database with fake models. Only the SEPA ticket has recorded answers, so "routine question", "approve", "edit" and "stale draft" use it; the fraud report has no recording and is handed off with `system_error`, which still shows the handoff notice and exercises the operator reply. The safe-rendering case (`<img onerror>`, `<script>`, `[x](javascript:…)`, a bare URL) runs in the browser too. axe (WCAG 2.1 A/AA) checks the landing, chat picker, chat, help, login, queue, ticket workspace, dashboard, settings, audit and KB pages.
+
+## 7. Design tokens
+
+The look is a calm, dense admin console (P12 polish): white page chrome, light grey surfaces, one blue, a grey text scale, 1px borders instead of shadows. The tokens are CSS variables in `apps/web/src/styles.css` (`:root`, prefix `--tb-`) and are exposed to Tailwind in its `@theme` block.
+
+| Token | Value | Use |
+|---|---|---|
+| `--tb-bg` | `#ffffff` | header, panels, inputs |
+| `--tb-surface` / `--tb-surface-hover` | `#f8f9fa` / `#f1f3f4` | page background, table head; hover rows, neutral chips |
+| `--tb-line` / `--tb-line-strong` | `#dadce0` / `#bdc1c6` | panel and table borders; form controls |
+| `--tb-text` / `--tb-text-2` / `--tb-text-muted` | `#202124` / `#3c4043` / `#5f6368` | body text; secondary text (5.7:1 on the surface) |
+| `--tb-primary` / `--tb-primary-hover` | `#1a73e8` / `#1765cc` | primary buttons, customer bubble, active tab line (white text 4.5:1) |
+| `--tb-primary-text` / `--tb-primary-weak` / `--tb-primary-strong` | `#1967d2` / `#e8f0fe` / `#174ea6` | links and blue text; selected nav, citation chips; blue text on the weak blue |
+| `--tb-ok`, `--tb-warn`, `--tb-danger`, `--tb-info` (+ `-weak`) | green, amber, red, blue pairs | status chips and banners, each pair ≥ 4.5:1 |
+| `--tb-space` | 8px | spacing grid: Tailwind steps 2, 4, 6, 8 …; step 1 (4px) only inside chips |
+| `--tb-radius` / `--tb-radius-sm` | 8px / 4px | panels, buttons, cards / form controls; chips are pills |
+| `--tb-row-height` | 48px | queue table rows |
+
+- **Classes.** Semantic colours: `bg-surface`, `bg-surface-hover`, `border-line`, `text-ink`, `text-muted`, `bg-primary`, `text-primary-text`, `bg-primary-weak`. Components: `btn` + `btn-primary` (one per area) / `btn-secondary` / `btn-danger`; `chip` + `chip-info` / `chip-ok` / `chip-warn` / `chip-danger` (always with a word, never colour alone); `field` (36px form control); `panel` (white box with a 1px border). The older `slate`, `red`, `amber`, `sky`, `emerald` and `brand` classes are mapped onto the tokens, so a page that still uses them follows the same look.
+- **Type.** Roboto (variable, `@fontsource-variable/roboto`, OFL), self-hosted by the build because the CSP allows fonts only from `'self'`. Body 14px; page titles 22px regular; panel titles 16px medium.
+- **Icons.** Material Symbols, outlined, weight 400 (Apache-2.0), only in navigation, status and actions. The path data of the icons in use is generated into `src/components/icons.generated.ts` from the pinned `@material-symbols/svg-400` by `node scripts/icons.mjs`; `<Icon>` draws it inline in the text colour and hides it from screen readers (the text next to it carries the meaning).
+- **Logo.** An original mark (two tally strokes under a bridge arch in a blue rounded square) with the wordmark "Tallybridge" (`src/components/Logo.tsx`); the same mark is `public/favicon.svg`.
+- **Demo marker.** The header shows a small "DEMO" badge whose tooltip and screen-reader text say "Demo · fictional company"; the public pages' footer says once that Tallybridge is a fictional company and the data is made up.
+- **Layouts.** Console: top bar (logo, badge, operator, log out) and a left navigation rail with icons (a horizontal strip under 768px). Public pages: top bar, content on the grey surface, footer. Login: a centred card with the mark.
