@@ -7,10 +7,12 @@ The canary must not be a repeat contact (`memory_shows_open_case`, ai-pipeline ย
 canary after the first would go to approval for that reason alone (P12). It asks as the first
 demo customer with no open ticket and no ticket from the last 17 days (the 14-day memory window
 plus the 72 hours after which `close-stale` closes an answered ticket and writes its memory);
-the customer API shows no intent, so any ticket counts. Its own ticket keeps that customer out
-of the next canaries for 17 days. The route it got must be `auto_reply` or `approval`
-(`ticket.status` `answered` or `pending_approval`): a handoff means the pipeline produced no
-answer the policy lets through, which a fixed help-centre question never needs.
+the customer API shows no intent, so any ticket counts. Only the non-restricted demo customers of
+`CANARY_CUSTOMERS` are tried: a restricted customer is always handed off (`customer_restricted`),
+and the customer API does not show the flag (deploy #17 asked as CUS-0007). Its own ticket keeps
+that customer out of the next canaries for 17 days. The route it got must be `auto_reply` or
+`approval` (`ticket.status` `answered` or `pending_approval`): a handoff means the pipeline
+produced no answer the policy lets through, which a fixed help-centre question never needs.
 
     DEMO_ACCESS_CODE=... uv run python infra/deploy/smoke.py --url https://... --canary
 """
@@ -28,6 +30,8 @@ import httpx2
 CANARY = "How long does a SEPA withdrawal take?"
 # ai-pipeline ยง9 memory window (14 days) + the close-stale delay (72 hours).
 CLEAN_FOR = timedelta(days=17)
+# Demo customers that are not restricted (data/seed/customers.json), in the order they are tried.
+CANARY_CUSTOMERS = ("CUS-0001", "CUS-0016", "CUS-0010", "CUS-0005", "CUS-0032")
 # `ticket.status` of the routes the canary may get: auto_reply and approval.
 EXPECTED_STATUSES = frozenset({"answered", "pending_approval"})
 
@@ -67,16 +71,18 @@ def clean_customer(client: httpx2.Client, access_code: str) -> tuple[str, dict[s
     listed = client.get("/api/v1/demo/customers", headers={"X-Demo-Access-Code": access_code})
     listed.raise_for_status()
     now = datetime.now(UTC)
-    for customer in listed.json():
-        cookie = login(client, access_code, customer["customer_ref"])
+    offered = {customer["customer_ref"] for customer in listed.json()}
+    for customer_ref in (ref for ref in CANARY_CUSTOMERS if ref in offered):
+        cookie = login(client, access_code, customer_ref)
         tickets = client.get("/api/v1/tickets", params={"limit": 100}, headers=cookie)
         tickets.raise_for_status()
         page = tickets.json()
         # More than 100 tickets: not worth paging through, take the next customer.
         if page["next_cursor"] is None and is_clean(page["items"], now):
-            return customer["customer_ref"], cookie
+            return customer_ref, cookie
     raise SystemExit(
-        "no demo customer without an open or recent ticket: the canary would be a repeat contact"
+        "no non-restricted demo customer without an open or recent ticket: the canary would be "
+        "handed off or a repeat contact"
     )
 
 
