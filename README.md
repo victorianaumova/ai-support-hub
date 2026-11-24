@@ -1,132 +1,147 @@
 # Enterprise AI Support Hub
 
-AI customer support for **Tallybridge**, a payments platform for freelancers and small businesses. A LangGraph workflow answers routine tickets in seconds, with a source for every fact, and sends everything risky to a human operator with a prepared draft.
+AI customer support for **Tallybridge**, a payments platform for freelancers and small businesses. A LangGraph workflow answers routine tickets with a source for every fact, and sends everything risky to a human operator with a prepared draft.
 
-> Tallybridge is a fictional company made for this project. It has no relation to any real company. All data is synthetic.
+> **Tallybridge is a fictional company** made for this project. It has no relation to any real company. All customers, cards, transactions and tickets are synthetic. This is a **portfolio demo, not a product**: it is not certified for anything and handles no real money or personal data.
 
-**Status:** build in progress (phase 4, evaluation). This README is replaced by the final version in phase 12 (demo link, numbers, diagram).
+**Live demo:** <https://hub-api-5mytwmsq4q-ew.a.run.app/> (Cloud Run, free tier, may take a few seconds to wake up). The chat needs an **access code, available on request**; operator logins on request too. Pick a demo customer and ask a question, then log in to the console to approve the draft.
 
-## What the system does
-
-1. A customer writes in the chat. Card numbers are masked before anything is stored.
-2. The workflow classifies the ticket, searches the knowledge base, reads the customer's own account data through tools, writes an answer with citations and checks it.
-3. Fixed policy rules and a rule-based confidence score (uncalibrated, ADR-0018) choose a route: **auto-reply**, **operator approval** or **handoff**.
-4. Operators review drafts in a console. A support lead sees quality, cost and automation numbers and can switch auto-replies off.
-5. Every model call is traced and costed. Every decision is in an audit log. Quality is measured on labelled tickets before anything is automated.
-
-## Documents
-
-| Document | Question it answers |
+| Customer chat: a routine question answered automatically, with sources | Operator: why the ticket is here, the draft and its sources |
 |---|---|
-| [docs/prd.md](docs/prd.md) | What do we build, for whom, and how do we know it works? |
-| [docs/tallybridge-world.md](docs/tallybridge-world.md) | What are the facts of the fictional company? |
-| [docs/design.md](docs/design.md) | How is the system built? Start here for architecture. |
-| [docs/data-model.md](docs/data-model.md) | Which tables, index and files exist? |
-| [docs/api.md](docs/api.md) | Which endpoints, events and MCP tools exist? |
-| [docs/ai-pipeline.md](docs/ai-pipeline.md) | How does the workflow think: nodes, prompts, routing, memory? |
-| [docs/eval-plan.md](docs/eval-plan.md) | How is quality measured, with which targets? |
-| [docs/security.md](docs/security.md) | What can go wrong and what stops it? |
-| [docs/operations.md](docs/operations.md) | How to run, observe, test and deploy? |
-| [docs/ui.md](docs/ui.md) | What do the chat and the console look like? |
-| [docs/adr/](docs/adr/README.md) | Why was each key decision made? |
-| [docs/build-plan.md](docs/build-plan.md) | In which order is it built, task by task? |
-| [docs/build-process.md](docs/build-process.md) | How is the build organised: sessions, agent roles, reviews, what the owner does? |
-| [AGENTS.md](AGENTS.md) | Rules for coding agents. |
+| ![Customer chat with a cited answer](docs/screenshots/readme/chat-auto-reply.png) | ![Operator ticket view](docs/screenshots/readme/ticket.png) |
+| **Queue:** drafts waiting for approval, with route reasons | **Dashboard:** routes, automation share, latency, cost, budget |
+| ![Ticket queue](docs/screenshots/readme/queue.png) | ![Lead dashboard](docs/screenshots/readme/dashboard.png) |
 
-## Technology
+*Screenshots from the local e2e stack with recorded model answers (`make test-e2e KEEP=1`), so the dashboard numbers are those of six test tickets.*
 
-Python 3.13 · FastAPI · LangGraph · LiteLLM (Anthropic only) · FastEmbed (local embeddings) · Qdrant (hybrid search) · Postgres · MCP · Langfuse · React + TypeScript · Docker · GitHub Actions · Cloud Run.
+## What it does
 
-**Budget mode** ([ADR-0018](docs/adr/0018-budget-mode.md)): the whole project spends about $5 on model calls. Every model role runs on Claude Haiku 5.5 (fallback Claude Sonnet 5.5); embeddings come from a local model. The LLM judge is the same model family as the writer, so it may prefer the writer's answers; judge numbers are reported as unvalidated. Evaluation uses 20 tickets and 16 attacks: a demo check that the system works, not a proof of quality ([eval plan](docs/eval-plan.md)).
+1. A customer writes in the chat. Card numbers, CVVs, PINs and 2FA codes are masked **before** anything is stored, logged or sent to a model.
+2. The workflow classifies the ticket, searches the knowledge base (hybrid search), reads the customer's own account data through read-only MCP tools, writes an answer with citations, and checks it (code checks + a claim verifier).
+3. Fixed policy rules first, then a rule-based confidence score, choose the route: **auto-reply**, **operator approval** or **handoff**. Fraud, restricted accounts, complaints, money actions, requests for a human, injection and non-English text always go to a human.
+4. Operators review drafts in a console. A support lead sees quality, cost and automation and can switch auto-reply off at any time (kill switch).
+5. Every model call is costed in `llm_calls` and traced; every decision and action is in a hash-chained, append-only audit log.
 
-## First numbers (phase 4, baseline B0)
+## Architecture
 
-> **Synthetic data. Demo check, not a proof.** 20 synthetic tickets that are also the tuning set; one ticket is 5 points, and 0 errors in 20 still allows a true error rate of up to 16%. Metrics marked *judged* come from an LLM judge that is **unvalidated and the same model family** as the writer (Claude Haiku 5.5).
+```mermaid
+flowchart LR
+    web["Web app<br/>React + TypeScript<br/>chat · console · dashboard"] -- "HTTPS JSON / SSE" --> api
+    subgraph hub ["Hub API · Python, FastAPI · one container"]
+        api["API + auth"] --> intake
+        subgraph wf ["LangGraph workflow"]
+            intake["intake<br/>mask, load context"] --> triage["triage<br/>LLM"] --> gate{"policy gate<br/>code"}
+            gate -- "continue" --> research["research<br/>KB search + read tools"] --> write["write<br/>LLM, citations"] --> verify["verify<br/>code + LLM"] --> decide{"decide<br/>rules + confidence"}
+            gate -- "must hand off" --> human["human review<br/>pause, survives restart"]
+            decide -- "approval / handoff" --> human
+            decide -- "auto-reply" --> respond["respond"]
+            human --> respond
+        end
+        gw["LLM gateway<br/>LiteLLM, masking check, cost, budget"]
+    end
+    triage & write & verify -.-> gw -.-> llm[("Anthropic<br/>Claude Haiku 5.5")]
+    research --> qd[("Qdrant<br/>dense + sparse")]
+    research -- "MCP" --> mcp["Support-tools MCP server<br/>core mock · Jira mock · Slack mock"]
+    human -. "approved Jira / Slack actions" .-> mcp
+    wf --> pg[("Postgres<br/>tickets, checkpoints,<br/>audit, costs, memory")]
+    wf -.-> lf[("Langfuse<br/>traces")]
+```
 
-Run `2026-11-17-b0_full_kb-4bc48fc`: the phase 3 linear pipeline (whole knowledge base in the prompt, no retrieval, no routing yet). Full report: [evals/runs/2026-11-17-b0_full_kb-4bc48fc/report.md](evals/runs/2026-11-17-b0_full_kb-4bc48fc/report.md); error analysis: [error-analysis.md](evals/runs/2026-11-17-b0_full_kb-4bc48fc/error-analysis.md); history: [docs/experiments.md](docs/experiments.md).
+Modular monolith ([ADR-0001](docs/adr/0001-modular-monolith.md)); details in [design](docs/design.md) and [AI pipeline](docs/ai-pipeline.md). Python 3.13 · FastAPI · LangGraph · LiteLLM (Anthropic only) · FastEmbed (local embeddings) · Qdrant · Postgres (Neon) · MCP · Langfuse · React + TypeScript · Docker · GitHub Actions · Cloud Run.
 
-| Metric | Value (count, 95% Wilson interval) | Target | Red line | Result |
+## Numbers
+
+> **Demo check, not a proof.** 20 synthetic dev tickets that were also used for tuning, so the numbers are optimistic; one ticket is 5 points, and 0 errors in 20 still allows a true error rate of up to 16% (95% Wilson interval). Metrics marked *judged* come from an LLM judge that is **not validated against human labels and is the same model family as the writer** (Claude Haiku 5.5), so it may favour the writer's answers.
+
+Dev run [`2026-11-24-rag_hybrid-f3bfeb7`](evals/runs/2026-11-24-rag_hybrid-f3bfeb7/report.md) (final pipeline, `write/v6`, uncached; [error analysis](evals/runs/2026-11-24-rag_hybrid-f3bfeb7/error-analysis.md)) and attack run [`2026-11-24-attacks-rag_hybrid-055c0c6`](evals/runs/2026-11-24-attacks-rag_hybrid-055c0c6/report.md) (16 attacks, 2 per category; every attack was handed off before the writer, so the `write/v5` of that commit does not matter).
+
+| Metric | Result (count, 95% interval) | Target | Red line | |
 |---|---|---|---|---|
-| Triage accuracy | 17 of 20 (64%–95%) | ≥ 18 of 20 | 16 of 20 | below target |
-| Flag recall (3 flags, n = 1 each) | 1 of 1 each (21%–100% each) | all | all | pass |
-| Key-fact coverage *(judged)* | 0.61 (14 tickets) | ≥ 0.85 | 0.75 | red line missed |
-| Answered tickets with an unsupported claim *(judged)* | 12 of 13 (67%–99%) | ≤ 1 | 2 | red line missed |
-| Answered tickets with an invalid citation *(judged)* | 10 of 13 (50%–92%) | 0 | 1 | red line missed |
-| Hard-handoff recall | 0 of 8 (0%–32%) | 1.00 | 1.00 | red line missed (no routing before phase 6) |
-| Escalation recall | 10 of 10 (72%–100%) | 1.00 | 1 miss | pass (trivial: everything goes to approval) |
-| Wrong auto-reply | 0 of 0 (auto-reply is off) | 0 | any | pass (trivial: everything goes to approval) |
-| Cost per ticket (answers only) | $0.0015; $0.0024 with judges ($0.048 for the run) | ≤ €0.05 | €0.10 | pass |
-| Retrieval, latency of auto-replies, safety | not measured yet (phases 5, 6 and 8) | | | — |
+| Triage accuracy | [16 of 20 (58–92%)](evals/runs/2026-11-24-rag_hybrid-f3bfeb7/report.md) | ≥ 18 of 20 | 16 of 20 | on the red line |
+| Flag recall (3 flags, 1 ticket each) | [1 of 1 each](evals/runs/2026-11-24-rag_hybrid-f3bfeb7/report.md) | all | all | pass |
+| Retrieval hit@5 | [8 of 9 (57–98%)](evals/runs/2026-11-24-rag_hybrid-f3bfeb7/report.md) | ≥ 0.90 | 0.80 | below target |
+| Key-fact coverage *(judged)* | [0.69 (9 tickets)](evals/runs/2026-11-24-rag_hybrid-f3bfeb7/report.md) | ≥ 0.85 | 0.75 | **red line missed** |
+| Answers with an unsupported claim *(judged)* | [2 of 9 (6–55%)](evals/runs/2026-11-24-rag_hybrid-f3bfeb7/report.md) | ≤ 1 | 2 | on the red line |
+| Answers with an invalid citation *(judged)* | [6 of 9 (35–88%)](evals/runs/2026-11-24-rag_hybrid-f3bfeb7/report.md); 3 of 9 real after removing [judge errors](evals/runs/2026-11-24-rag_hybrid-f3bfeb7/error-analysis.md) | 0 | 1 | **red line missed** |
+| Hard-handoff recall (fraud, restricted, …) | [8 of 8 (68–100%)](evals/runs/2026-11-24-rag_hybrid-f3bfeb7/report.md) | all | all | pass |
+| Escalation recall | [10 of 10 (72–100%)](evals/runs/2026-11-24-rag_hybrid-f3bfeb7/report.md) | all | 1 miss | pass |
+| Wrong auto-reply | [0 of 0](evals/runs/2026-11-24-rag_hybrid-f3bfeb7/report.md) | 0 | any | empty: the evaluation sends nothing automatically |
+| Cost per ticket (answers) | [$0.0010](evals/runs/2026-11-24-rag_hybrid-f3bfeb7/report.md) | ≤ €0.05 | €0.10 | pass |
+| Latency, all runs (real model) | [p50 2.8 s, p95 11.7 s](evals/runs/2026-11-24-rag_hybrid-f3bfeb7/report.md) | auto-replies: p50 ≤ 8 s, p95 ≤ 20 s | p95 30 s | auto-replies not measured |
+| Successful attacks | [0 of 16](evals/runs/2026-11-24-attacks-rag_hybrid-055c0c6/report.md) | 0 | 1 of 16 | pass |
+| Internal content in answers | [0](evals/runs/2026-11-24-attacks-rag_hybrid-055c0c6/report.md) | 0 | 0 | pass |
+| Card numbers stored, logged or sent | [0 real; leak scan: 2 false positives](docs/requirements-trace.md#leak-scan-2026-11-24) | 0 | 0 | pass |
+| Safety-code line coverage | [99.89%](docs/requirements-trace.md#non-functional-requirements) | ≥ 95% | 90% | pass |
+| Load smoke, **fake models: model time not included** | [10 parallel customers, 50 tickets: p50 1,423 ms, p95 1,915 ms, 0 errors, 0 lost runs](https://github.com/victorianaumova/ai-support-hub/pull/67) | — | — | reported |
 
-Every ticket went to operator approval: B0 has no policy gate or handoff yet, so the hard-handoff red line cannot be met until P6-02, and the escalation-recall and wrong-auto-reply passes say nothing about routing quality or safety. Auto-reply stays off.
+The whole run cost [$0.0345](evals/runs/2026-11-24-rag_hybrid-f3bfeb7/report.md) with judges. Every PRD requirement and its proof: [requirements trace](docs/requirements-trace.md). Run history: [experiments](docs/experiments.md).
 
-## Phase 5 numbers (retrieval, `rag_hybrid`)
+### Two red lines are missed, and auto-reply is on anyway
 
-> Same caveats as above: **synthetic data, demo check, not a proof**; *judged* metrics are unvalidated, same model family.
+Citation validity and key-fact coverage missed their red lines in the milestone run and in one targeted fix run. The rule of the eval plan is that a missed red line keeps auto-reply off. **For the cloud demo only, the owner decided to keep auto-reply allowed** ([ADR-0023](docs/adr/0023-auto-reply-on-after-missed-red-lines.md)), so the demo shows all three routes. Nothing was loosened: red lines, thresholds and code defaults (`AUTO_REPLY_ALLOWED=false`) are unchanged. What still limits the risk: only allow-listed routine intents can be auto-replied, the verify step sends unsupported drafts to a human, the confidence floor is 0.95, every risky topic hands off first, a lead can switch auto-reply off at any time, and a daily budget caps spend. **A real product would keep auto-reply off** until the red lines pass on a larger held-out set with a validated judge.
 
-Run `2026-11-17-rag_hybrid-4fc85cb`: the linear pipeline with one hybrid knowledge-base search (top 6 chunks), the writer `write/v2` citing chunks, and the new verify step (code checks, then an LLM claim check). Full report: [evals/runs/2026-11-17-rag_hybrid-4fc85cb/report.md](evals/runs/2026-11-17-rag_hybrid-4fc85cb/report.md); error analysis: [error-analysis.md](evals/runs/2026-11-17-rag_hybrid-4fc85cb/error-analysis.md).
+Known error types ([error analysis](evals/runs/2026-11-24-rag_hybrid-f3bfeb7/error-analysis.md)), which is what a demo auto-reply can get wrong:
 
-**B0 against RAG is not measured.** The comparison experiment (E1) was removed in budget mode (ADR-0018), and the faithfulness and citation numbers are not comparable for two reasons: this run was judged with `judge_*/v2` and B0 with v1, and the judges' evidence differs (here every chunk the writer read; in B0 only the documents the draft cites).
+- **Wrong source:** an account detail cited to a help-centre article or to another account fact (T-0008, T-0013).
+- **Missed fact:** the right section is not retrieved (9 of 13 missing facts), or the writer leaves out a fact its sources hold (T-0008, T-0018).
+- **Own conclusion:** a sentence states something no cited source says (T-0020).
 
-| Metric | Value (count, 95% Wilson interval) | Gate 5 / red line | Result |
-|---|---|---|---|
-| hit@5 (first search) | 14 of 18 (55%–91%); MRR 0.61 | ≥ 0.80 | **missed** (one ticket short) |
-| Answered tickets with an unsupported claim *(judged)* | 6 of 9 (35%–88%) | at most 2 | **missed** |
-| Key-fact coverage *(judged)* | 0.41 (14 tickets) | 0.75 | missed |
-| Answered tickets with an invalid citation *(judged)* | 5 of 9 (27%–81%) | 1 | missed |
-| Drafts that answered (`can_answer`) | 9 of 20 | — | reported |
-| Cost per ticket (answers only) | $0.0007; $0.018 paid for the run with judges | €0.10 | pass |
+## What is not measured
 
-Gate 5 is not met. The error analysis sorts every failure by cause. The prompts were not tuned to these numbers; changes are decided by the owner. Every ticket still goes to operator approval, and auto-reply stays off.
+- **The experiments E1–E8 and E10**, removed by the $5 budget ([ADR-0018](docs/adr/0018-budget-mode.md)): whole knowledge base in the prompt against RAG (E1), dense against hybrid search (E2), reranker (E3), section against fixed-size chunks (E4), `top_k` (E5), tools on/off (E6), retry loop on/off (E7), small against strong model per role (E8), fine-tuned classifier against LLM triage (E10). Hybrid search, section chunks and Haiku for every role are defaults, not measured choices. E9 (the confidence threshold) was removed too ([ADR-0019](docs/adr/0019-scope-cuts.md)): 0.95 is a seeded value, not a tuned one.
+- **The wrong-answer rate of auto-replies** and **their latency:** the evaluation never auto-replies (the deployment lock stays on there), so "wrong auto-reply 0 of 0" tests nothing. A real rollout would need at least 300 reviewed answers (PRD NFR-4).
+- **Judge quality:** no human-labelled validation set, and the judge is the same family as the writer.
+- **Time to first visible reaction**, availability, and capacity with real models (the load smoke uses recorded answers).
+- **A held-out test set:** none exists in budget mode; the 20 dev tickets are also the tuning set.
 
-## Load smoke (phase 10, fake models)
+## What does not work
 
-**Fake models: model time not included.** `make load-smoke` (P10-08, `infra/load/smoke.py`): 10 parallel demo customers send 50 tickets through the API and the whole workflow (triage, search, write, verify) with recorded model answers, so it measures the service around the models, not answer time. Run on 2026-11-23 against the local e2e stack (`make test-e2e KEEP=1`: one API container, Postgres, Qdrant, local embeddings on a laptop), not a cloud deployment (P10-07 is still waiting for human gate H8).
+- Citation validity and key-fact coverage miss their red lines (above).
+- Masking (G1) keeps the digits of a card written with unusual separators (colons, pipes, invisible characters…): 14 of 16 [known-limitation probes](evals/runs/2026-11-24-attacks-rag_hybrid-055c0c6/report.md). Accepted limitations ([security](docs/security.md) §3).
+- The injection score (G4) alone catches none of the 9 probe injections; the triage flag `injection_suspected` is what hands them off.
+- The leak scan reports LangGraph interrupt ids as card data or 2FA codes ([2 false positives](docs/requirements-trace.md#leak-scan-2026-11-24)); fix open.
+- The audit hash chain cannot detect the deletion of its last rows (a known, tested limitation).
+- English only: other languages are handed off. One channel (chat). Jira, Slack and the core banking system are mocks.
+- One model provider: when Anthropic is down, every ticket goes to an operator.
+- Not built: `make eval-smoke`, `make eval-report`, `make export-review-candidates`.
+- With `make dev` (fake models) only the recorded test tickets get an answer; any other text is handed off as `system_error`. Set `LLM_MODE=real` and an Anthropic key for real answers.
 
-| Tickets | Latency to the stream's `done` p50 | p95 | Error rate | Lost runs |
-|---|---|---|---|---|
-| 50 (10 customers × 5) | 1,423 ms | 1,915 ms | 0 of 50 (0%) | 0 |
+## Limits of synthetic data
 
-## Connect to Claude Code
+The company, its 40 customers, 53 knowledge-base articles (plus an error-code table) and every ticket were written for this project from one [world file](docs/tallybridge-world.md). The tickets are cleaner and shorter than real ones, the same author wrote the questions and the answers, and 20 tickets cannot cover the long tail of a real support queue. The numbers show that the method works end to end and where it breaks; they say nothing about how a real support team would perform. Designed with PCI-DSS- and GDPR-inspired constraints (masking, data minimisation, retention, erasure, audit), not certified.
 
-The support-tools MCP server (`apps/mcp_server`, [API](docs/api.md) §7) works from any MCP client. It serves mock data only: the 40 fictional customers of `data/seed`, and Jira and Slack mocks that store calls in a local SQLite file.
+## Run locally in 5 commands
 
-**Over stdio** (Claude Code starts the server itself; run from the repository root after `make setup`):
+Needs Docker, Python 3.13 with `uv`, Node.js 24 with `pnpm`, and `make`.
+
+```
+git clone https://github.com/victorianaumova/ai-support-hub.git && cd ai-support-hub
+make setup                 # Python and web dependencies, .env from .env.example, local embedding model
+$EDITOR .env               # set SEED_OPERATOR_PASSWORD, SESSION_SECRET, DEMO_ACCESS_CODE, MCP_SERVER_TOKEN
+make dev                   # Postgres, Qdrant, API, MCP server; migrate, seed, load the knowledge base
+pnpm -C apps/web dev       # web app on http://localhost:5173
+```
+
+The stack runs with fake models (no API key, no cost). Tests: `make lint test test-int test-e2e`. More in [operations](docs/operations.md).
+
+## Connect the MCP server to Claude Code
+
+The support-tools MCP server (`apps/mcp_server`, [API](docs/api.md) §7) serves mock data only: the 40 fictional customers of `data/seed`, and Jira and Slack mocks that store calls in a local SQLite file. Over stdio (Claude Code starts the server; run from the repository root after `make setup`):
 
 ```
 claude mcp add --env CORE_ANCHOR_DATE=2026-11-12 --transport stdio support-tools -- uv run --directory "$PWD" python -m support_tools --transport stdio
 ```
 
-Leave out `--env CORE_ANCHOR_DATE=…` to use today's date. Keep `--transport stdio` between `--env` and the name.
-
-**Over HTTP** (the server of `make dev`, port 8001, with the token from `.env`):
+Or over HTTP, against the server of `make dev` (port 8001, token from `.env`):
 
 ```
 claude mcp add --transport http support-tools http://127.0.0.1:8001/mcp --header "Authorization: Bearer $MCP_SERVER_TOKEN"
 ```
 
-Check with `claude mcp list`, or `/mcp` inside a session, then ask for example "Use core_get_transaction for CUS-0001, TX-000900". Without `--scope` the server is added for this project on your machine only (`local`). `make mcp-smoke` checks both transports with the official MCP client (list the tools, call `core_get_transaction`). The MCP Inspector works the same way: `npx @modelcontextprotocol/inspector@2.13.0 uv run python -m support_tools`.
+Check with `claude mcp list` or `/mcp`, then ask for example "Use core_get_transaction for CUS-0001, TX-000900". Leave out `--env CORE_ANCHOR_DATE=…` to use today's date. `make mcp-smoke` checks both transports with the official MCP client.
 
-## How this project is built
+## How it was built
 
-The design package was written first. A coding agent builds the system phase by phase from [the build plan](docs/build-plan.md); the owner reviews each phase, checks the attack set and makes the risk decisions (whether auto-reply goes on in the demo). Each phase ends with a walkthrough for the owner, written locally to `docs/walkthrough/`. Walkthroughs are personal notes: the folder is git-ignored and they are not in this repository.
+The design package came first ([PRD](docs/prd.md), [design](docs/design.md), [eval plan](docs/eval-plan.md), [security](docs/security.md), 23 [ADRs](docs/adr/README.md)). A coding agent built the system task by task from the [build plan](docs/build-plan.md) and opened one pull request per task; a reviewer subagent checked each one, and the owner merged and made the risk decisions ([build process](docs/build-process.md), [AGENTS.md](AGENTS.md)). CI runs lint, types, unit, integration and e2e tests, data checks and security scans on every pull request, with no real model calls; the demo deploys from CI with a smoke test and automatic rollback ([operations](docs/operations.md) §5–6).
 
-## CI and branch protection
-
-CI (`.github/workflows/ci.yml`, see [operations](docs/operations.md) §5) runs on every pull request and every push to `main`. It has four required jobs: `lint` (ruff, mypy strict, import-linter), `test` (unit tests, with no provider API key), `data-check`, and `security` (gitleaks over the whole history, pip-audit). Each runs the same `make` target you run locally. A fifth job, `hook-bootstrap`, is **informational and not required**: it shows that the gitleaks pre-commit hook installs on a machine with no Go and no pre-commit cache. It downloads Go from go.dev, so an outage there must not block a merge.
-
-Branch protection is **not turned on yet**. GitHub does not offer branch protection or rulesets for a private repository on the free plan, and this repository stays private until phase 12. Until then the rules below hold **by process**: the coding agent opens pull requests and never merges, and only the owner merges, after CI is green.
-
-The owner turns branch protection on in phase 12, when the repository becomes public (Settings → Rules → Rulesets, or Settings → Branches). The rule for `main`:
-
-- Changes reach `main` only through a pull request. Nobody pushes to `main` directly, admins included.
-- Required status checks: `lint`, `test`, `data-check`, `security` (not `hook-bootstrap`). The branch must be up to date with `main` before merging.
-- Every review conversation must be resolved before merging.
-- No force-pushes, and `main` cannot be deleted.
-- One task = one pull request (see [build process](docs/build-process.md)). The coding agent opens it; only the owner merges.
-
-## Honest limits
-
-- Synthetic company, synthetic customers, synthetic tickets. Numbers show that the method works, not how a real support team would perform.
-- Designed with PCI-DSS- and GDPR-inspired constraints (card-number masking, data minimisation, audit log). Not certified.
-- English only. One channel (chat).
+Licence: [MIT](LICENSE).

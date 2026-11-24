@@ -124,7 +124,7 @@ Trace attributes on every run: `run_id`, `ticket_id` (also the Langfuse session,
 
 No workflow runs an evaluation or any other real model call, except the post-deploy canary ticket (§6, under one cent). `make eval-smoke` runs by hand, only when the owner asks ([ADR-0018](adr/0018-budget-mode.md)).
 
-Branch rule: changes reach `main` only through pull requests, and CI must be green. Until phase 12 the repository is private on the free GitHub plan, which has no branch protection, so the rule holds by process (only the owner merges). The owner turns branch protection on when the repository becomes public; the README section "CI and branch protection" lists the settings.
+Branch rule: changes reach `main` only through pull requests, and CI must be green. While the repository was private on the free GitHub plan (no branch protection), the rule held by process (only the owner merges). Now the repository is public and the active ruleset `main` (Settings → Rules → Rulesets) applies to the default branch: changes only through a pull request; required status checks `lint`, `test`, `test-int`, `data-check` and `security` (not `e2e`, `web` or the informational `hook-bootstrap`); no force-pushes; the branch cannot be deleted. The ruleset does not require the branch to be up to date with `main` or review conversations to be resolved. The coding agent opens pull requests and never merges; only the owner merges ([build process](build-process.md)).
 
 ## 6. Deployment (demo, free tier)
 

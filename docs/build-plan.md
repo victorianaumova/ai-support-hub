@@ -39,7 +39,7 @@ How the sessions, agent roles and reviews are organised: [build process](build-p
 | H3. Review the knowledge-base articles | P2-08 |
 | H6. Review the attack set | P8-01 |
 | H8. Accounts: Google Cloud (billing + budget alert), Neon, Qdrant Cloud; optional Langfuse Cloud (ADR-0021; the demo runs without it); no Jira or Slack (ADR-0019). Done 2026-11-23 | P10-07 |
-| H9. Record the demo video; publish (make the repository public and turn on branch protection for `main`, see the README) | P12 |
+| H9. Record the demo video; publish (make the repository public and turn on branch protection for `main`, see [operations](operations.md) §5) | P12 |
 
 **Rules that never bend:** see `AGENTS.md` ("Never do").
 
