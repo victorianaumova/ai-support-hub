@@ -1,0 +1,570 @@
+{
+  "cache": {
+    "enabled": false,
+    "hits": 0,
+    "misses": 0
+  },
+  "checks": [
+    {
+      "higher_is_better": true,
+      "judged": false,
+      "name": "triage accuracy",
+      "red_line": 0.8,
+      "red_line_text": "16 of 20",
+      "shown": "16 of 20 (80%; 95% CI 58%-92%)",
+      "status": "below target",
+      "target": 0.9,
+      "target_text": "\u2265 18 of 20",
+      "value": 0.8
+    },
+    {
+      "higher_is_better": true,
+      "judged": false,
+      "name": "flag recall: wants_human",
+      "red_line": 1.0,
+      "red_line_text": "all",
+      "shown": "1 of 1 (100%; 95% CI 21%-100%)",
+      "status": "pass",
+      "target": 1.0,
+      "target_text": "all",
+      "value": 1.0
+    },
+    {
+      "higher_is_better": true,
+      "judged": false,
+      "name": "flag recall: reports_unauthorised_activity",
+      "red_line": 1.0,
+      "red_line_text": "all",
+      "shown": "1 of 1 (100%; 95% CI 21%-100%)",
+      "status": "pass",
+      "target": 1.0,
+      "target_text": "all",
+      "value": 1.0
+    },
+    {
+      "higher_is_better": true,
+      "judged": false,
+      "name": "flag recall: is_complaint_or_legal",
+      "red_line": 1.0,
+      "red_line_text": "all",
+      "shown": "1 of 1 (100%; 95% CI 21%-100%)",
+      "status": "pass",
+      "target": 1.0,
+      "target_text": "all",
+      "value": 1.0
+    },
+    {
+      "higher_is_better": true,
+      "judged": false,
+      "name": "hit@5",
+      "red_line": 0.8,
+      "red_line_text": "0.80",
+      "shown": "8 of 9 (89%; 95% CI 57%-98%)",
+      "status": "below target",
+      "target": 0.9,
+      "target_text": "\u2265 0.90",
+      "value": 0.8889
+    },
+    {
+      "higher_is_better": true,
+      "judged": false,
+      "name": "MRR",
+      "red_line": null,
+      "red_line_text": "\u2014",
+      "shown": "0.80 (9 tickets)",
+      "status": "reported",
+      "target": null,
+      "target_text": "reported",
+      "value": 0.8
+    },
+    {
+      "higher_is_better": true,
+      "judged": true,
+      "name": "key-fact coverage",
+      "red_line": 0.75,
+      "red_line_text": "0.75",
+      "shown": "0.73 (9 tickets)",
+      "status": "red line missed",
+      "target": 0.85,
+      "target_text": "\u2265 0.85",
+      "value": 0.7315
+    },
+    {
+      "higher_is_better": false,
+      "judged": true,
+      "name": "faithfulness: answered tickets with an unsupported claim",
+      "red_line": 2,
+      "red_line_text": "2",
+      "shown": "2 of 8 (25%; 95% CI 7%-59%)",
+      "status": "below target",
+      "target": 1,
+      "target_text": "\u2264 1",
+      "value": 2.0
+    },
+    {
+      "higher_is_better": false,
+      "judged": true,
+      "name": "citation validity: answered tickets with an invalid marker",
+      "red_line": 1,
+      "red_line_text": "1",
+      "shown": "5 of 9 (56%; 95% CI 27%-81%)",
+      "status": "red line missed",
+      "target": 0,
+      "target_text": "0",
+      "value": 5.0
+    },
+    {
+      "higher_is_better": true,
+      "judged": false,
+      "name": "hard-handoff recall",
+      "red_line": 1.0,
+      "red_line_text": "1.00",
+      "shown": "8 of 8 (100%; 95% CI 68%-100%)",
+      "status": "pass",
+      "target": 1.0,
+      "target_text": "1.00",
+      "value": 1.0
+    },
+    {
+      "higher_is_better": false,
+      "judged": false,
+      "name": "escalation recall",
+      "red_line": 1,
+      "red_line_text": "1 miss",
+      "shown": "10 of 10 (100%; 95% CI 72%-100%); 0 missed",
+      "status": "pass",
+      "target": 0,
+      "target_text": "1.00",
+      "value": 0.0
+    },
+    {
+      "higher_is_better": true,
+      "judged": false,
+      "name": "escalation precision",
+      "red_line": null,
+      "red_line_text": "\u2014",
+      "shown": "10 of 20 (50%; 95% CI 30%-70%)",
+      "status": "reported",
+      "target": null,
+      "target_text": "reported",
+      "value": 0.5
+    },
+    {
+      "higher_is_better": false,
+      "judged": false,
+      "name": "wrong auto-reply",
+      "red_line": 0,
+      "red_line_text": "any",
+      "shown": "0 of 0",
+      "status": "pass",
+      "target": 0,
+      "target_text": "0",
+      "value": 0.0
+    },
+    {
+      "higher_is_better": true,
+      "judged": false,
+      "name": "automation share",
+      "red_line": null,
+      "red_line_text": "\u2014",
+      "shown": "0 of 20 (0%; 95% CI 0%-16%)",
+      "status": "reported",
+      "target": null,
+      "target_text": "reported",
+      "value": 0.0
+    },
+    {
+      "higher_is_better": true,
+      "judged": false,
+      "name": "account facts used",
+      "red_line": null,
+      "red_line_text": "\u2014",
+      "shown": "8 of 9 (89%; 95% CI 57%-98%) of tickets needing account data with a draft (9 without a draft)",
+      "status": "reported",
+      "target": null,
+      "target_text": "reported",
+      "value": 0.8889
+    },
+    {
+      "higher_is_better": false,
+      "judged": false,
+      "name": "cost per ticket (USD)",
+      "red_line": 0.1,
+      "red_line_text": "\u20ac0.10",
+      "shown": "$0.0010",
+      "status": "pass",
+      "target": 0.05,
+      "target_text": "\u2264 \u20ac0.05",
+      "value": 0.001
+    },
+    {
+      "higher_is_better": false,
+      "judged": false,
+      "name": "latency p50, auto-replied (ms)",
+      "red_line": null,
+      "red_line_text": "\u2014",
+      "shown": "no auto-reply",
+      "status": "not measured",
+      "target": 8000,
+      "target_text": "\u2264 8 s",
+      "value": null
+    },
+    {
+      "higher_is_better": false,
+      "judged": false,
+      "name": "latency p95, auto-replied (ms)",
+      "red_line": 30000,
+      "red_line_text": "30 s",
+      "shown": "no auto-reply",
+      "status": "not measured",
+      "target": 20000,
+      "target_text": "\u2264 20 s",
+      "value": null
+    },
+    {
+      "higher_is_better": false,
+      "judged": false,
+      "name": "PAN leakage",
+      "red_line": null,
+      "red_line_text": "0",
+      "shown": "phase 8 (`make eval-attacks`, `make leak-scan`)",
+      "status": "not measured",
+      "target": null,
+      "target_text": "0",
+      "value": null
+    },
+    {
+      "higher_is_better": false,
+      "judged": false,
+      "name": "attack success",
+      "red_line": null,
+      "red_line_text": "1 of 16",
+      "shown": "phase 8 (`make eval-attacks`, `make leak-scan`)",
+      "status": "not measured",
+      "target": null,
+      "target_text": "0",
+      "value": null
+    },
+    {
+      "higher_is_better": false,
+      "judged": false,
+      "name": "internal leak",
+      "red_line": null,
+      "red_line_text": "0",
+      "shown": "phase 8 (`make eval-attacks`, `make leak-scan`)",
+      "status": "not measured",
+      "target": null,
+      "target_text": "0",
+      "value": null
+    }
+  ],
+  "cost_per_ticket_usd": "0.00097775",
+  "cost_usd": "0.019555",
+  "errors": {},
+  "judge_cost_usd": "0.015126",
+  "judge_errors": {
+    "faithfulness: StructuredOutputError": 1
+  },
+  "judge_llm_calls": 63,
+  "judge_paid_cost_usd": "0.015126",
+  "llm_calls": 62,
+  "metrics": {
+    "account_data": {
+      "excluded_no_draft": 9,
+      "facts_without_label": 0,
+      "needs_account_data": 18,
+      "used": {
+        "ci95": [
+          0.565,
+          0.9801
+        ],
+        "count": 8,
+        "total": 9,
+        "value": 0.8889
+      }
+    },
+    "answers": {
+      "citation_validity": {
+        "code_problems": 0,
+        "invalid": {
+          "ci95": [
+            0.2667,
+            0.8112
+          ],
+          "count": 5,
+          "total": 9,
+          "value": 0.5556
+        },
+        "judged_citations": 44,
+        "judged_unsupported": 13
+      },
+      "faithfulness": {
+        "answered": 9,
+        "no_claims_listed": 0,
+        "not_judged": 1,
+        "quotes_not_found": 0,
+        "unfaithful": {
+          "ci95": [
+            0.0715,
+            0.5907
+          ],
+          "count": 2,
+          "total": 8,
+          "value": 0.25
+        }
+      },
+      "judge": "unvalidated, same model family",
+      "key_fact_coverage": {
+        "covered": 9,
+        "excluded_no_kb_search": 5,
+        "excluded_not_judged": 0,
+        "tickets_without_key_facts": 6,
+        "value": 0.7314814814814814
+      }
+    },
+    "cost": {
+      "per_ticket_usd": "0.00097775"
+    },
+    "latency": {
+      "all": {
+        "count": 20,
+        "p50_ms": 3064.5,
+        "p95_ms": 12470.800000000001
+      },
+      "auto_reply": {
+        "count": 0,
+        "p50_ms": null,
+        "p95_ms": null
+      }
+    },
+    "retrieval": {
+      "covered": 9,
+      "excluded_no_kb_search": 11,
+      "hit_at_5": {
+        "ci95": [
+          0.565,
+          0.9801
+        ],
+        "count": 8,
+        "total": 9,
+        "value": 0.8889
+      },
+      "mrr": 0.8
+    },
+    "routing": {
+      "automation_share": {
+        "ci95": [
+          0.0,
+          0.1611
+        ],
+        "count": 0,
+        "total": 20,
+        "value": 0.0
+      },
+      "escalation_precision": {
+        "ci95": [
+          0.2993,
+          0.7007
+        ],
+        "count": 10,
+        "total": 20,
+        "value": 0.5
+      },
+      "escalation_recall": {
+        "ci95": [
+          0.7225,
+          1.0
+        ],
+        "count": 10,
+        "total": 10,
+        "value": 1.0
+      },
+      "hard_handoff_recall": {
+        "ci95": [
+          0.6756,
+          1.0
+        ],
+        "count": 8,
+        "total": 8,
+        "value": 1.0
+      },
+      "wrong_auto_reply": {
+        "ci95": null,
+        "count": 0,
+        "total": 0,
+        "value": null
+      }
+    },
+    "triage": {
+      "accuracy": {
+        "ci95": [
+          0.584,
+          0.9193
+        ],
+        "count": 16,
+        "total": 20,
+        "value": 0.8
+      },
+      "confusion_matrix": {
+        "account_management": {
+          "fees_fx": 1
+        },
+        "account_restricted": {
+          "account_restricted": 1
+        },
+        "card_declined": {
+          "card_declined": 3
+        },
+        "card_lost_stolen": {
+          "card_lost_stolen": 1
+        },
+        "dispute_chargeback": {
+          "dispute_chargeback": 1
+        },
+        "fees_fx": {
+          "fees_fx": 2
+        },
+        "kyc_verification": {
+          "kyc_verification": 2
+        },
+        "limits": {
+          "payment_pending": 1
+        },
+        "login_security": {
+          "card_lost_stolen": 1
+        },
+        "other": {
+          "other": 1
+        },
+        "payment_pending": {
+          "payment_pending": 3
+        },
+        "withdrawal_issue": {
+          "other": 1,
+          "withdrawal_issue": 2
+        }
+      },
+      "flag_recall": {
+        "is_complaint_or_legal": {
+          "ci95": [
+            0.2065,
+            1.0
+          ],
+          "count": 1,
+          "total": 1,
+          "value": 1.0
+        },
+        "reports_unauthorised_activity": {
+          "ci95": [
+            0.2065,
+            1.0
+          ],
+          "count": 1,
+          "total": 1,
+          "value": 1.0
+        },
+        "wants_human": {
+          "ci95": [
+            0.2065,
+            1.0
+          ],
+          "count": 1,
+          "total": 1,
+          "value": 1.0
+        }
+      }
+    }
+  },
+  "paid_cost_usd": "0.019555",
+  "route_reasons": {
+    "action_request": 3,
+    "complaint": 1,
+    "customer_request": 1,
+    "fraud_report": 1,
+    "language": 1,
+    "no_kb_answer": 1,
+    "policy_intent": 5,
+    "policy_review": 8,
+    "restricted_account": 1,
+    "unsupported_claims": 1
+  },
+  "routes": {
+    "approval": 9,
+    "handoff": 11
+  },
+  "runs_failed": 0,
+  "stopped_at_cost_limit": false,
+  "stopped_by_estimate": false,
+  "tickets_finished": 20,
+  "tickets_planned": 20,
+  "tickets_with_problems": [
+    {
+      "problems": [
+        "intent payment_pending (label limits)",
+        "key-fact coverage 0.50",
+        "judge faithfulness failed (StructuredOutputError)",
+        "invalid citation"
+      ],
+      "ticket_id": "T-0013"
+    },
+    {
+      "problems": [
+        "intent fees_fx (label account_management)",
+        "key-fact coverage 0.40",
+        "2 unsupported claims",
+        "invalid citation"
+      ],
+      "ticket_id": "T-0018"
+    },
+    {
+      "problems": [
+        "key-fact coverage 0.67",
+        "invalid citation"
+      ],
+      "ticket_id": "T-0002"
+    },
+    {
+      "problems": [
+        "key-fact coverage 0.60",
+        "invalid citation"
+      ],
+      "ticket_id": "T-0008"
+    },
+    {
+      "problems": [
+        "invalid citation"
+      ],
+      "ticket_id": "T-0001"
+    },
+    {
+      "problems": [
+        "intent other (label withdrawal_issue)"
+      ],
+      "ticket_id": "T-0005"
+    },
+    {
+      "problems": [
+        "key-fact coverage 0.75"
+      ],
+      "ticket_id": "T-0006"
+    },
+    {
+      "problems": [
+        "1 unsupported claims"
+      ],
+      "ticket_id": "T-0007"
+    },
+    {
+      "problems": [
+        "key-fact coverage 0.67"
+      ],
+      "ticket_id": "T-0009"
+    },
+    {
+      "problems": [
+        "intent card_lost_stolen (label login_security)"
+      ],
+      "ticket_id": "T-0015"
+    }
+  ]
+}
