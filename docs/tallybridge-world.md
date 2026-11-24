@@ -93,6 +93,7 @@ Business days are Monday–Friday without the closing days of the euro payment s
 - Two-factor authentication (2FA) is mandatory: authenticator app or SMS.
 - 5 wrong passwords lock login for 30 minutes. 3 wrong card PINs block the card PIN; the customer unblocks it in the app.
 - The customer can **freeze and unfreeze** a card in the app at any time. A lost or stolen card must be frozen at once and then replaced (replacement = new delivery fee).
+- Replacing a card that was never delivered is free (owner decision, P12 data PR).
 - Tallybridge staff never ask for a full card number, CVV, PIN, password or 2FA code. Not in chat, not by email, not by phone.
 - **Account restrictions.** Compliance can restrict an account (no outgoing payments) during a review. Staff and AI must **not** tell the customer the reason or the details of the review (legal "tipping-off" rule). The only allowed message: the account is under review, the team may contact the customer for documents, typical time is up to 10 business days.
 - Unauthorised transactions: the customer must report them within 13 months. Support freezes the card and opens a fraud case. Only humans handle fraud cases.

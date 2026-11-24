@@ -4,7 +4,7 @@ title: Why was my card payment declined?
 product: card
 visibility: external
 intents: [card_declined]
-updated_at: 2026-11-14
+updated_at: 2026-11-24
 ---
 ## Check the error code
 
@@ -25,8 +25,8 @@ Daily limits are in EUR equivalent and reset at 00:00 CET.
 
 ## PIN problems
 
-- **ERR-3007:** the number you entered at the terminal or ATM was wrong. Try again with the right PIN.
-- **ERR-3003:** after 3 wrong PINs, the PIN is blocked. Unblock it in the app.
+- **ERR-3007: wrong PIN.** The PIN you entered at the terminal or ATM was wrong. Try again with the right PIN.
+- **ERR-3003: card PIN blocked after 3 wrong PINs.** Unblock the PIN in the app.
 
 ## Blocked merchants
 

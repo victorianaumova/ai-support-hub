@@ -17,10 +17,10 @@ ERR-2030,Mass Payouts need the Business tier,Mass Payouts are only available on 
 ERR-2031,Too many recipients in the file,Your mass payout file has more than 500 recipients. One file can have up to 500 recipients.,Split the recipients into files of 500 recipients or fewer and upload each file.,external
 ERR-3001,Insufficient balance,Your balance is too low for this card payment. The card spends from your Tallybridge balance.,Add money to your balance and try the payment again.,external
 ERR-3002,Card frozen,"This card is frozen, so the payment was declined.","Unfreeze the card in the app if it is safe, then try again.",external
-ERR-3003,After 3 wrong PINs the PIN is blocked,Your card PIN is blocked after 3 wrong PINs.,Unblock the PIN in the app. Then use the right PIN.,external
+ERR-3003,Card PIN blocked after 3 wrong PINs,Your card PIN is blocked after 3 wrong PINs.,Unblock the PIN in the app. Then use the right PIN.,external
 ERR-3004,Card cancelled,This card is cancelled and cannot be used.,Use another active card. Contact support if you need a new card.,external
 ERR-3005,Merchant category blocked,"The card cannot be used for this type of merchant. Blocked categories are gambling, crypto exchanges and adult content.",Use another way to pay this merchant.,external
-ERR-3007,Incorrect card PIN,The PIN you entered is wrong. After 3 wrong PINs the PIN is blocked.,Try again with the right PIN.,external
+ERR-3007,Wrong PIN,The PIN you entered is wrong. After 3 wrong PINs the PIN is blocked.,Try again with the right PIN.,external
 ERR-3009,3-D Secure failed,The online security check (3-D Secure) for this payment was not completed.,Try the payment again and complete the security check.,external
 ERR-3011,Daily card spend limit reached,"Your card payments today reached the daily spend limit: €5,000 (Verified) or €15,000 (Business). Limits are in EUR equivalent.",Try again after the limit resets at 00:00 CET.,external
 ERR-3012,Daily ATM withdrawal limit reached,"Your ATM withdrawals today reached the daily limit: €1,000 (Verified) or €2,000 (Business). Limits are in EUR equivalent.",Try again after the limit resets at 00:00 CET.,external
@@ -36,8 +36,8 @@ ERR-4015,Business documents incomplete,Your company documents or the details of 
 ERR-4020,Country not supported,Tallybridge cannot open or serve accounts in this country.,We cannot open an account for this country.,external
 ERR-5001,Login locked,Your login is locked for 30 minutes after 5 wrong passwords.,"Wait 30 minutes, then log in with the correct password. If you did not try to log in, contact support.",external
 ERR-5002,Wrong password,"The password you entered is wrong. After 5 wrong passwords, your login is locked for 30 minutes.",Check your password and try again.,external
-ERR-5003,Login code invalid (2FA),The 2FA code you entered is not valid.,"Enter the newest code from your authenticator app or SMS. Never share this code with anyone, including Tallybridge staff.",external
-ERR-5004,Two-factor authentication not set up,"Two-factor authentication (2FA) is mandatory, and it is not set up on your account.",Set up 2FA with an authenticator app or SMS.,external
+ERR-5003,2FA code invalid,The 2FA code you entered is not valid.,"Enter the newest code from your authenticator app or SMS. Never share this code with anyone, including Tallybridge staff.",external
+ERR-5004,2FA not set up,"Two-factor authentication (2FA) is mandatory, and it is not set up on your account.",Set up 2FA with an authenticator app or SMS.,external
 ERR-5010,Account under review,Your account is under review. Our team may contact you for documents. A review typically takes up to 10 business days.,"Check your messages in the app and your email. If our team asks for documents, upload them.",external
 ERR-5011,Identity check not finished,"Your identity check is not finished. Until it is finished, you can only log in and upload documents.","Upload your verification documents in the app. The KYC review (Starter, Verified) takes 1–2 business days. The KYB review (Business) takes 3–5 business days.",external
 ERR-5012,Account has a balance,Your account cannot be closed while it has a balance.,Withdraw your balance first. The account is closed 30 days after your request.,external

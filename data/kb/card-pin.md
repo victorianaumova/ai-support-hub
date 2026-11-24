@@ -4,19 +4,19 @@ title: "Card PIN: wrong PIN and blocked PIN"
 product: card
 visibility: external
 intents: [card_declined]
-updated_at: 2026-11-14
+updated_at: 2026-11-24
 ---
 ## Wrong PIN
 
 If you enter a wrong PIN, the payment or ATM withdrawal is declined.
-The app then shows the error code ERR-3007.
+The app then shows ERR-3007 (wrong PIN).
 
 Try again with the right PIN. Be careful: after 3 wrong PINs, the PIN is blocked.
 
 ## Blocked PIN
 
 After 3 wrong PINs, your card PIN is blocked.
-The app then shows the error code ERR-3003.
+The app then shows ERR-3003 (card PIN blocked after 3 wrong PINs).
 
 You can unblock the PIN yourself in the app:
 

@@ -4,7 +4,7 @@ title: Account limits
 product: account
 visibility: external
 intents: [limits]
-updated_at: 2026-11-14
+updated_at: 2026-11-24
 ---
 ## Limits per tier
 
@@ -17,6 +17,10 @@ updated_at: 2026-11-14
 | ATM withdrawal per day | — | €1,000 | €2,000 |
 
 Starter accounts have no card.
+
+## Pending card payments
+
+Pending card payments count toward the daily card spend limit.
 
 ## Limits are in EUR
 
