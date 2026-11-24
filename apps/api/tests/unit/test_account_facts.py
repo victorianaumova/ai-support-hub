@@ -231,7 +231,7 @@ def test_without_facts_the_writer_and_verifier_get_what_they_got_before() -> Non
 
 
 def test_write_v4_has_the_facts_and_the_memory_in_the_user_part() -> None:
-    assert PROMPT.version == "write/v5"
+    assert PROMPT.version == "write/v6"
     memory = CustomerContext(
         memory=[
             MemoryItem(

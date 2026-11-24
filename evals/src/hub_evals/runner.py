@@ -12,6 +12,8 @@ run's own cost limit in place of the daily budget, and the disk cache.
   same run directory runs only the tickets not in `results.jsonl`. The run directory is
   `evals/runs/<date>-<variant>-<git sha>/`, so a re-run on the same day and commit continues the
   same run. `--restart` starts it again from the first ticket.
+- **Same start state** (P12): before the first ticket every start closes the tickets earlier
+  starts left open (`close_open_tickets`), so no ticket is a repeat contact of an earlier run.
 - **Disk cache** of model answers, on by default (`--no-cache` turns it off): `CachingProvider`
   in the gateway, under `evals/.cache/llm/<LLM_MODE>/`. A cache hit makes no provider call and
   is recorded with mode `fake` (nothing paid).
@@ -528,6 +530,59 @@ async def prepare_database(database: Database, seed_dir: Path, kb_dir: Path) -> 
         ) from None
 
 
+# Who closes the tickets of earlier starts in the audit log (`close_open_tickets`).
+RESET_ACTOR = "eval-runner"
+
+
+def close_path(status: TicketStatus) -> list[TicketStatus]:
+    """The allowed steps (data model §1, state diagram) from `status` to `closed`. A ticket that
+    waits for approval or is still processing is handed off first: the diagram has no direct
+    step to `closed` from there, and the runner keeps to it like every other caller."""
+    if status == TicketStatus.CLOSED:
+        return []
+    if status in (TicketStatus.PENDING_APPROVAL, TicketStatus.PROCESSING):
+        return [TicketStatus.HANDED_OFF, TicketStatus.CLOSED]
+    return [TicketStatus.CLOSED]
+
+
+async def close_open_tickets(database: Database) -> int:
+    """Close every ticket of the evaluation database that is not closed, before a start runs
+    any ticket; returns how many. Each start must begin from the same state: an open ticket left
+    by an earlier start with the same customer and intent makes `memory_shows_open_case` true
+    (P6-05), so every answered ticket would wait for approval (`policy_review`, P12-00 error
+    analysis). The routing rule is right for real customers; the leftover state is the runner's.
+    Through `change_status` with one `ticket.closed` audit record each, no memory summary (no
+    model call). A resumed start closes the tickets of its own finished results too: they are
+    already written to `results.jsonl`."""
+    closed = 0
+    async with database.sessions.begin() as session:
+        rows = await session.scalars(
+            select(TicketRow)
+            .where(TicketRow.status != TicketStatus.CLOSED)
+            .order_by(TicketRow.id)
+            .with_for_update()
+        )
+        tickets = TicketRepository(session)
+        for row in rows.all():
+            from_status = row.status
+            for target in close_path(from_status):
+                await tickets.change_status(row, target)
+            if row.resolved_at is None:
+                row.resolved_at = datetime.now(UTC)
+                await tickets.save(row)
+            await record(
+                session,
+                actor_type=ActorType.SYSTEM,
+                actor_id=RESET_ACTOR,
+                action="ticket.closed",
+                entity_type="ticket",
+                entity_id=row.id,
+                details={"from_status": from_status.value, "job": "eval-reset"},
+            )
+            closed += 1
+    return closed
+
+
 async def create_ticket(database: Database, ticket: EvalItem) -> tuple[Any, Any, bool]:
     """The ticket, its history and the new customer message in the evaluation database, masked
     as the API masks them (G1). Returns the ticket id, the message id and whether masking of the
@@ -925,6 +980,8 @@ class Report:
     estimate: Estimate | None = None
     cache_hits: int = 0
     cache_misses: int = 0
+    # Tickets of earlier starts closed before this start (`close_open_tickets`).
+    tickets_closed: int = 0
     # Paid in this run directory: written results (resumed ones included) and the calls of
     # this run, also those of tickets that were not written.
     spent_usd: Decimal = Decimal(0)
@@ -1173,6 +1230,7 @@ async def _run_with(
     report = Report(run_dir=run_dir, planned=len(tickets), skipped=len(tickets) - len(todo), ran=0)
 
     await prepare_database(database, options.seed_dir, options.kb_dir)
+    report.tickets_closed = await close_open_tickets(database)
     async with database.sessions() as session:
         sources = await load_external_sources(session)
     if not sources:
@@ -1344,6 +1402,7 @@ def describe(report: Report, settings: Settings) -> list[str]:
     lines.append(
         f"eval: {report.planned} tickets, {report.skipped} already finished, {report.ran} run now"
     )
+    lines.append(f"eval: closed {report.tickets_closed} open tickets of earlier starts")
     lines.append(f"eval: cache hits {report.cache_hits}, misses {report.cache_misses}")
     if report.unavailable:
         lines.append(

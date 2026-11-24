@@ -67,6 +67,6 @@ roles:
     timeout_s: 30
 
 prompts:
-  {triage: v1, research: v2, write: v5, verify: v1, handoff_summary: v1, memory_summary: v1,
+  {triage: v1, research: v2, write: v6, verify: v1, handoff_summary: v1, memory_summary: v1,
    # Evaluation judges (eval plan §5), all on the `judge` role.
    judge_key_facts: v1, judge_faithfulness: v3, judge_citation: v3, judge_attack: v1}

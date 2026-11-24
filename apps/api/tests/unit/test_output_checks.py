@@ -397,7 +397,7 @@ def test_a_copied_prompt_instruction_fails() -> None:
 
 
 def test_a_prompt_fragment_in_other_texts_fails() -> None:
-    write = load_prompt(ROOT / "prompts", "write", "v5").system
+    write = load_prompt(ROOT / "prompts", "write", "v6").system
     fragment = " ".join(oc.words(write)[40:60])
     draft = DraftToCheck(
         can_answer=False,
@@ -413,9 +413,9 @@ def test_a_prompt_fragment_in_other_texts_fails() -> None:
 
 
 def test_an_example_of_a_prompt_is_not_a_fragment() -> None:
-    """write/v5 shows an example answer; an answer may say the same."""
+    """write/v6 shows an example answer; an answer may say the same."""
     example = "This error means the IBAN is not valid [2]."
-    assert example.split(" [")[0] in load_prompt(ROOT / "prompts", "write", "v5").system
+    assert example.split(" [")[0] in load_prompt(ROOT / "prompts", "write", "v6").system
     assert not PROMPTS.found_in(example)
     assert not oc.prompt_text(
         ['Say "you can check the status of the withdrawal in the app".']

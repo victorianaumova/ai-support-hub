@@ -192,7 +192,7 @@ def test_a_second_ticket_of_the_customer_has_the_first_ones_summary_in_context(
     # write/v3 (P7-04): the writer reads the memory item, as context, in every write call
     assert provider.memory_blocks
     assert all(f"(withdrawal_issue): {SUMMARY}" in block for block in provider.memory_blocks)
-    # the recorded SEPA run: triage withdrawal_issue; with the write/v5 recordings (P7-06) the
+    # the recorded SEPA run: triage withdrawal_issue; with the write/v6 recordings (P7-06) the
     # check passes without a retry, so the memory's open case on the intent decides (row 6).
     assert values["triage"].intent == "withdrawal_issue"
     assert values["retry_count"] == 0
