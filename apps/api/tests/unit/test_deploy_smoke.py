@@ -82,3 +82,64 @@ def test_the_canary_fails_on_a_handoff_an_error_or_a_cut_stream(
 ) -> None:
     with pytest.raises(SystemExit, match=why):
         smoke.check_stream(smoke.stream_events(_lines(*events)))
+
+
+class _Response:
+    def __init__(self, body: object = None, cookies: dict[str, str] | None = None) -> None:
+        self._body = body
+        self.cookies = cookies or {}
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> object:
+        return self._body
+
+
+class _Client:
+    """The two demo endpoints and the ticket list, with no network: `tickets` per customer."""
+
+    def __init__(self, listed: list[str], tickets: dict[str, list[dict[str, str]]]) -> None:
+        self.listed = listed
+        self.tickets = tickets
+        self.logins: list[str] = []
+
+    def post(self, path: str, json: dict[str, str]) -> _Response:
+        assert path == "/api/v1/demo/session"
+        self.logins.append(json["customer_ref"])
+        return _Response(cookies={"hub_customer": json["customer_ref"]})
+
+    def get(self, path: str, headers: dict[str, str], params: object = None) -> _Response:
+        if path == "/api/v1/demo/customers":
+            return _Response([{"customer_ref": ref} for ref in self.listed])
+        ref = headers["Cookie"].removeprefix("hub_customer=")
+        return _Response({"items": self.tickets.get(ref, []), "next_cursor": None})
+
+
+def test_the_canary_never_asks_as_a_restricted_customer() -> None:
+    # Deploy #17: CUS-0007 (restricted) came first and the canary was handed off.
+    client = _Client(["CUS-0007", "CUS-0001", "CUS-0016"], {})
+    ref, cookie = smoke.clean_customer(client, "code")
+    assert ref == "CUS-0001"
+    assert cookie == {"Cookie": "hub_customer=CUS-0001"}
+    assert "CUS-0007" not in client.logins
+
+
+def test_the_canary_takes_the_next_clean_allowed_customer() -> None:
+    recent = [_ticket("closed", timedelta(days=1))]
+    client = _Client(["CUS-0007", "CUS-0001", "CUS-0016"], {"CUS-0001": recent})
+    assert smoke.clean_customer(client, "code")[0] == "CUS-0016"
+
+
+def test_the_canary_fails_when_only_restricted_customers_are_listed() -> None:
+    with pytest.raises(SystemExit, match="non-restricted"):
+        smoke.clean_customer(_Client(["CUS-0007"], {}), "code")
+
+
+def test_the_canary_customers_are_demo_customers_and_not_restricted() -> None:
+    demo = {entry["customer_ref"] for entry in json.loads(
+        (ROOT / "data/seed/demo_customers.json").read_text())}  # fmt: skip
+    customers = json.loads((ROOT / "data/seed/customers.json").read_text())
+    restricted = {c["external_ref"] for c in customers if c["restricted"]}
+    assert set(smoke.CANARY_CUSTOMERS) <= demo
+    assert not set(smoke.CANARY_CUSTOMERS) & restricted
