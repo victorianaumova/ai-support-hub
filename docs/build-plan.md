@@ -39,7 +39,6 @@ How the sessions, agent roles and reviews are organised: [build process](build-p
 | H3. Review the knowledge-base articles | P2-08 |
 | H6. Review the attack set | P8-01 |
 | H8. Accounts: Google Cloud (billing + budget alert), Neon, Qdrant Cloud; optional Langfuse Cloud (ADR-0021; the demo runs without it); no Jira or Slack (ADR-0019). Done 2026-11-23 | P10-07 |
-| H9. Record the demo video; publish (make the repository public and turn on branch protection for `main`, see [operations](operations.md) §5) | P12 |
 
 **Rules that never bend:** see `AGENTS.md` ("Never do").
 
@@ -60,9 +59,8 @@ Size: S = under half a day of agent work with review, M = about a day, L = sever
 | 8 | Security | Attack suite, hardening, privacy functions |
 | 9 | LLMOps (P9-01 only) | Run traces in Langfuse, per-step durations in the console |
 | 10 | Deployment | Web app, containers, public demo, CI/CD |
-| 12 | Interview preparation | README with numbers, case study, demo script |
 
-Phase 9 (LLMOps) was removed by ADR-0019 except P9-01 (tracing), which ADR-0021 restored; phase 11 was removed by ADR-0018.
+Phase 9 (LLMOps) was removed by ADR-0019 except P9-01 (tracing), which ADR-0021 restored; phase 11 was removed by ADR-0018; phase 12 was removed by owner decision after P12-00 and P12-01.
 
 Dependency notes: phases run in order. Exception: web tasks P10-01 to P10-03 need only the APIs of phases 2, 6 and 7 and may be built in parallel with phase 8. P10-04 needs P10-09 (metrics and settings API) first.
 
@@ -252,15 +250,9 @@ Removed by [ADR-0018](adr/0018-budget-mode.md): the fine-tuning experiment (E10)
 
 ---
 
-## Phase 12 — Portfolio package
+## Phase 12 — removed
 
-| ID | Task | Size | Done when |
-|---|---|---|---|
-| P12-00 | **Milestone run** (moved from P9-06 by ADR-0019). One run with `--no-cache` on the 20 tickets and the 16 attacks with the chosen configuration (there is no test set, ADR-0018); results into the README, marked "demo check, not a proof". | S | Table with target / red line / result for every metric, with counts and intervals; failures stated openly. **Outcome:** citation validity and key-fact coverage missed in `055c0c6` and in the `write/v6` fix run `f3bfeb7`; auto-reply stays on in the cloud demo by owner decision ([ADR-0023](adr/0023-auto-reply-on-after-missed-red-lines.md)). |
-| P12-01 | **README final.** One page: what it is, demo link and access, architecture diagram, numbers table (milestone run on the 20 tickets, marked "demo check, not a proof", with the same-family judge note) with targets and red lines, the questions not measured (E1–E8, E10), what does not work, limits of synthetic data, how to run locally in 5 commands. Also write `docs/requirements-trace.md` (each PRD requirement → the test or metric that proves it). | S | Passes the checklist in section 3. |
-| P12-02 | **Case study** `docs/case-study.md`: problem → approach → data → architecture → evaluation → routing and business numbers → security → what failed → what next. About 1,500 words. | M | Every number links to a report. |
-| P12-03 | **Demo script** `docs/demo-script.md` for a 3–5 minute video: routine ticket, card number masked, fraud handoff, operator approval with Jira, dashboard and kill switch. No scene uses CUS-0032 (Thornbury Analytics Ltd): it is the deploy canary's customer (operations §6). **Human gate H9** (recording). | S | Script runs against the demo with the listed demo customers. |
-| P12-04 | **Interview notes** `docs/interview-notes.md`: 25 likely questions about this system with short answers that point to the ADRs, experiments and walkthroughs. | S | Covers design, evaluation, RAG, agents, security, cost, working with coding agents. |
+Removed by owner decision (2026-11-24). Done before the removal: P12-00 (milestone run, moved from P9-06 by ADR-0019; citation validity and key-fact coverage missed in `055c0c6` and in the `write/v6` fix run `f3bfeb7`; auto-reply stays on in the cloud demo by [ADR-0023](adr/0023-auto-reply-on-after-missed-red-lines.md)) and P12-01 (final README and `docs/requirements-trace.md`). Not built: P12-02 (case study), P12-03 (demo script, human gate H9), P12-04 (interview notes).
 
 ---
 
