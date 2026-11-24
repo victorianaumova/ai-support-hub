@@ -9,7 +9,7 @@
   ],
   "run_02": [
     "multi-currency-account#3",
-    "account-limits#1",
+    "account-limits#2",
     "currency-conversion#1",
     "inactivity-fee#2",
     "multi-currency-account#4",

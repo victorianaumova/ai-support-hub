@@ -4,7 +4,7 @@ title: Two-factor authentication (2FA)
 product: security
 visibility: external
 intents: [login_security]
-updated_at: 2026-11-14
+updated_at: 2026-11-24
 ---
 ## 2FA is mandatory
 
@@ -13,14 +13,14 @@ Every Tallybridge account must use two-factor authentication (2FA). When you log
 1. an authenticator app, or
 2. SMS.
 
-## ERR-5004: two-factor authentication not set up
+## ERR-5004: 2FA not set up
 
 If two-factor authentication is not set up on your account, the app shows ERR-5004.
 Set up 2FA with an authenticator app or SMS before you continue.
 
-## ERR-5003: login code not accepted
+## ERR-5003: 2FA code invalid
 
-The code you entered is not valid.
+The 2FA code you entered is not valid.
 
 1. Make sure you use the newest code.
 2. If you use an authenticator app, check that you use the entry for Tallybridge.

@@ -4,7 +4,7 @@ title: "Internal: lost, stolen and undelivered cards"
 product: card
 visibility: internal
 intents: [card_lost_stolen]
-updated_at: 2026-11-14
+updated_at: 2026-11-24
 ---
 ## First instruction at once
 
@@ -32,7 +32,7 @@ A card that has not arrived is not lost until the delivery time has passed.
 
 1. Check the delivery method and the order date.
 2. If the time has not passed, explain the delivery time.
-3. If the time has passed, freeze the card and discuss a replacement with the customer. The operator decides about the delivery fee for this replacement.
+3. If the time has passed, freeze the card and discuss a replacement with the customer. Replacing a card that was never delivered is free: do not charge the delivery fee.
 
 ## Card found again
 

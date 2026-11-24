@@ -4,7 +4,7 @@ title: "Physical card delivery: times and fees"
 product: card
 visibility: external
 intents: [card_lost_stolen, fees_fx]
-updated_at: 2026-11-14
+updated_at: 2026-11-24
 ---
 ## Delivery options and fees
 
@@ -28,7 +28,7 @@ You can use a virtual card while your physical card is on its way. Virtual cards
 1. Check which delivery option you chose and the date you ordered the card.
 2. Count the business days. Standard delivery takes 7–14 business days in the EU and up to 21 business days elsewhere. Express takes 3–5 business days.
 3. If the time has not passed yet, please wait a little longer.
-4. If the time has passed, contact us. Tell us the date you ordered the card and your delivery address country.
+4. If the time has passed, contact us. Tell us the date you ordered the card and your delivery address country. Replacing a card that never arrived is free.
 
 If you think someone else has your card, freeze it in the app at once.
 
