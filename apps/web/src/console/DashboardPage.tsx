@@ -95,9 +95,9 @@ export function DashboardPage() {
   const evals = useQuery({ queryKey: ["console", "evals"], queryFn: async () => unwrap(await api.GET("/api/v1/console/evals/latest")).run });
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+    <div className="px-4 py-4 sm:px-6">
       <div className="flex flex-wrap items-end gap-4">
-        <h1 className="text-[1.375rem] font-normal">Dashboard</h1>
+        <h1 className="flex h-12 items-center text-[1.375rem] font-normal">Dashboard</h1>
         <fieldset className="flex flex-wrap items-end gap-2 text-sm">
           <legend className="sr-only">Period</legend>
           <label>

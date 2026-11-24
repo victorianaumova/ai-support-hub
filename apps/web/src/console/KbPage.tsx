@@ -32,8 +32,8 @@ export function KbPage() {
   });
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-      <h1 className="text-[1.375rem] font-normal">Knowledge base</h1>
+    <div className="px-4 py-4 sm:px-6">
+      <h1 className="flex h-12 items-center text-[1.375rem] font-normal">Knowledge base</h1>
       <form
         role="search"
         className="mt-4 flex flex-wrap gap-2"

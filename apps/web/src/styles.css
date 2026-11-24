@@ -4,37 +4,40 @@
  * blue, a grey text scale, 1px borders instead of shadows, an 8px grid and an 8px radius.
  * Every text/background pair below meets WCAG AA (4.5:1); colour is never the only signal. */
 :root {
-  --tb-bg: #ffffff;
-  --tb-surface: #f8f9fa;
-  --tb-surface-hover: #f1f3f4;
-  --tb-line: #dadce0;
-  --tb-line-strong: #bdc1c6;
+  --tb-bg: #ffffff; /* the content sheet, panels, inputs */
+  --tb-shell: #f8fafd; /* app frame: header, nav rail, page behind the sheet */
+  --tb-surface: #f8fafd;
+  --tb-surface-hover: #f0f4f9;
+  --tb-line: #e1e3e1; /* dividers and panel borders */
+  --tb-line-strong: #c4c7c5; /* outlined buttons and form controls */
 
-  --tb-text: #202124;
-  --tb-text-2: #3c4043;
-  --tb-text-muted: #5f6368; /* 5.7:1 on --tb-surface */
+  --tb-text: #1f1f1f;
+  --tb-text-2: #444746;
+  --tb-text-muted: #5e6368; /* 5.8:1 on --tb-shell */
 
-  --tb-primary: #1a73e8; /* fills; white text on it is 4.5:1 */
-  --tb-primary-hover: #1765cc;
-  --tb-primary-text: #1967d2; /* links and blue text on white or grey */
-  --tb-primary-weak: #e8f0fe;
-  --tb-primary-strong: #174ea6; /* blue text on --tb-primary-weak */
+  --tb-primary: #0b57d0; /* fills; white text on it is 6.4:1 */
+  --tb-primary-hover: #0842a0;
+  --tb-primary-text: #0b57d0; /* links and blue text: 6.1:1 on the shell */
+  --tb-primary-weak: #d3e3fd; /* selected nav item, citation chips */
+  --tb-primary-strong: #041e49; /* text on --tb-primary-weak */
+  --tb-primary-hover-tint: rgb(11 87 208 / 0.08);
 
-  --tb-ok: #0d652d;
+  --tb-ok: #146c2e;
   --tb-ok-weak: #e6f4ea;
   --tb-warn: #7a4100;
   --tb-warn-weak: #fef7e0;
   --tb-warn-line: #f9cb6b;
-  --tb-danger: #a50e0e;
-  --tb-danger-fill: #c5221f;
+  --tb-danger: #b3261e;
+  --tb-danger-fill: #b3261e;
   --tb-danger-weak: #fce8e6;
-  --tb-info: #174ea6;
+  --tb-info: #0b57d0;
   --tb-info-weak: #e8f0fe;
 
   --tb-space: 8px; /* the grid: use Tailwind steps 2, 4, 6, 8 … (multiples of 8px; 1 = 4px for tight insides) */
   --tb-radius: 8px;
   --tb-radius-sm: 4px;
-  --tb-row-height: 48px;
+  --tb-radius-sheet: 16px; /* the white content sheet */
+  --tb-row-height: 44px;
 }
 
 @theme {
@@ -45,6 +48,7 @@
   --radius-lg: var(--tb-radius);
 
   /* Semantic colours (prefer these in new code: bg-surface, border-line, text-muted …). */
+  --color-shell: var(--tb-shell);
   --color-surface: var(--tb-surface);
   --color-surface-hover: var(--tb-surface-hover);
   --color-line: var(--tb-line);
@@ -53,6 +57,8 @@
   --color-primary: var(--tb-primary);
   --color-primary-text: var(--tb-primary-text);
   --color-primary-weak: var(--tb-primary-weak);
+  --color-primary-strong: var(--tb-primary-strong);
+  --radius-sheet: var(--tb-radius-sheet);
 
   /* The older palette classes follow the tokens, so every page shares one look. */
   --color-brand-50: var(--tb-primary-weak);
@@ -99,7 +105,7 @@
 @layer base {
   html {
     color: var(--tb-text);
-    background: var(--tb-bg);
+    background: var(--tb-shell);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
@@ -127,7 +133,7 @@
   gap: 8px;
   min-height: 36px;
   padding: 0 16px;
-  border-radius: var(--tb-radius);
+  border-radius: 9999px;
   border: 1px solid transparent;
   font-weight: 500;
   font-size: 0.875rem;
@@ -149,21 +155,20 @@
   }
 }
 @utility btn-secondary {
-  background: var(--tb-bg);
-  border-color: var(--tb-line);
+  background: transparent;
+  border-color: var(--tb-line-strong);
   color: var(--tb-primary-text);
   &:hover:not(:disabled) {
-    background: var(--tb-primary-weak);
-    border-color: var(--tb-primary-weak);
+    background: var(--tb-primary-hover-tint);
   }
   &:disabled {
     color: var(--tb-text-muted);
-    background: var(--tb-surface);
+    border-color: var(--tb-line);
   }
 }
 @utility btn-danger {
-  background: var(--tb-bg);
-  border-color: var(--tb-line);
+  background: transparent;
+  border-color: var(--tb-line-strong);
   color: var(--tb-danger);
   &:hover:not(:disabled) {
     background: var(--tb-danger-weak);
@@ -178,9 +183,9 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 24px;
+  min-height: 22px;
   padding: 0 8px;
-  border-radius: 12px;
+  border-radius: var(--tb-radius-sm);
   font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.33;
@@ -207,7 +212,7 @@
 
 /* A form control: 36px tall, 1px border, blue border on focus. */
 @utility field {
-  min-height: 36px;
+  min-height: 32px;
   border: 1px solid var(--tb-line-strong);
   border-radius: var(--tb-radius-sm);
   padding: 0 8px;
@@ -223,4 +228,42 @@
   background: var(--tb-bg);
   border: 1px solid var(--tb-line);
   border-radius: var(--tb-radius);
+}
+
+/* Icon-only round button (refresh, back): 40px target, tinted on hover. */
+@utility btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  color: var(--tb-text-2);
+  &:hover {
+    background: var(--tb-primary-hover-tint);
+    color: var(--tb-primary-text);
+  }
+}
+
+/* Open data table (no box): header row and rows divided by 1px lines, compact rows. */
+@utility data-table {
+  width: 100%;
+  text-align: left;
+  border-collapse: collapse;
+  & th {
+    height: 40px;
+    padding: 0 16px;
+    font-weight: 500;
+    color: var(--tb-text);
+    border-bottom: 1px solid var(--tb-line-strong);
+    white-space: nowrap;
+  }
+  & td {
+    padding: 8px 16px;
+    vertical-align: top;
+    border-bottom: 1px solid var(--tb-line);
+  }
+  & tbody tr:hover {
+    background: var(--tb-surface);
+  }
 }

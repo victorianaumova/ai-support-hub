@@ -54,9 +54,9 @@ export function AuditPage() {
   );
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+    <div className="px-4 py-4 sm:px-6">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-[1.375rem] font-normal">Audit log</h1>
+        <h1 className="flex h-12 items-center text-[1.375rem] font-normal">Audit log</h1>
         <button type="button" onClick={() => { verify.mutate(); }} disabled={verify.isPending} className="ml-auto btn btn-secondary">
           {verify.isPending ? "Checking…" : "Verify chain"}
         </button>
@@ -78,7 +78,7 @@ export function AuditPage() {
           Filter
         </button>
       </form>
-      <div className="mt-4 overflow-x-auto panel">
+      <div className="mt-4 overflow-x-auto">
         {log.isPending ? (
           <Loading label="Loading the audit log" />
         ) : log.isError ? (
@@ -86,26 +86,26 @@ export function AuditPage() {
         ) : rows.length === 0 ? (
           <p className="p-6 text-muted">No records.</p>
         ) : (
-          <table className="w-full min-w-[48rem] text-left text-sm">
-            <thead className="bg-surface text-xs font-medium text-muted">
+          <table className="data-table min-w-[48rem]">
+            <thead>
               <tr>
-                <th scope="col" className="p-2">#</th>
-                <th scope="col" className="p-2">Time</th>
-                <th scope="col" className="p-2">Actor</th>
-                <th scope="col" className="p-2">Action</th>
-                <th scope="col" className="p-2">Entity</th>
-                <th scope="col" className="p-2"><span className="sr-only">Details</span></th>
+                <th scope="col">#</th>
+                <th scope="col">Time</th>
+                <th scope="col">Actor</th>
+                <th scope="col">Action</th>
+                <th scope="col">Entity</th>
+                <th scope="col"><span className="sr-only">Details</span></th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.id} className="border-t border-line">
-                  <td className="p-2 tabular-nums">{row.id}</td>
-                  <td className="p-2">{new Date(row.ts).toLocaleString()}</td>
-                  <td className="p-2">{row.actor_type}{row.actor_id ? ` · ${row.actor_id.slice(0, 8)}` : ""}</td>
-                  <td className="p-2 font-mono text-xs">{row.action}</td>
-                  <td className="p-2">{row.entity_type} · {row.entity_id.slice(0, 12)}</td>
-                  <td className="p-2">
+                <tr key={row.id}>
+                  <td className="tabular-nums">{row.id}</td>
+                  <td>{new Date(row.ts).toLocaleString()}</td>
+                  <td>{row.actor_type}{row.actor_id ? ` · ${row.actor_id.slice(0, 8)}` : ""}</td>
+                  <td className="font-mono text-xs">{row.action}</td>
+                  <td>{row.entity_type} · {row.entity_id.slice(0, 12)}</td>
+                  <td>
                     <button type="button" onClick={() => { setOpen(row); }} className="text-primary-text hover:underline">
                       Details<span className="sr-only"> of record {row.id}</span>
                     </button>

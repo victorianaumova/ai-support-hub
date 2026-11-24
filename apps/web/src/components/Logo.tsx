@@ -15,8 +15,8 @@ export function Logo({ product }: { product?: string }) {
   return (
     <span className="inline-flex items-center gap-2">
       <LogoMark />
-      <span className="text-lg font-medium tracking-tight text-ink">Tallybridge</span>
-      {product !== undefined && <span className="hidden text-lg text-muted sm:inline">{product}</span>}
+      <span className="text-[1.375rem] tracking-tight text-[var(--tb-text-2)]">Tallybridge</span>
+      {product !== undefined && <span className="hidden text-[1.375rem] text-[var(--tb-text-2)] sm:inline">{product}</span>}
     </span>
   );
 }
@@ -24,7 +24,7 @@ export function Logo({ product }: { product?: string }) {
 /** The demo marker: a small badge, with "fictional company" for screen readers and as a tooltip. */
 export function DemoBadge() {
   return (
-    <span title="Demo · fictional company" className="chip chip-warn uppercase tracking-wider">
+    <span title="Demo · fictional company" className="inline-flex h-8 items-center rounded-full border border-[var(--tb-line-strong)] bg-amber-50 px-3 text-xs font-medium uppercase tracking-wider text-amber-900">
       <span aria-hidden="true">Demo</span>
       <span className="sr-only">Demo · fictional company</span>
     </span>

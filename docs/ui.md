@@ -98,24 +98,25 @@ As built (P10-05, `apps/web/e2e/`): the scenarios run in order on one database w
 
 ## 7. Design tokens
 
-The look is a calm, dense admin console (P12 polish): white page chrome, light grey surfaces, one blue, a grey text scale, 1px borders instead of shadows. The tokens are CSS variables in `apps/web/src/styles.css` (`:root`, prefix `--tb-`) and are exposed to Tailwind in its `@theme` block.
+The look follows a cloud admin console (P12 polish; feel only, no copied assets): a tinted shell (top bar and navigation rail) around a white content sheet with rounded corners, one blue, a grey text scale, open tables divided by 1px lines, pill buttons. The tokens are CSS variables in `apps/web/src/styles.css` (`:root`, prefix `--tb-`) and are exposed to Tailwind in its `@theme` block.
 
 | Token | Value | Use |
 |---|---|---|
-| `--tb-bg` | `#ffffff` | header, panels, inputs |
-| `--tb-surface` / `--tb-surface-hover` | `#f8f9fa` / `#f1f3f4` | page background, table head; hover rows, neutral chips |
-| `--tb-line` / `--tb-line-strong` | `#dadce0` / `#bdc1c6` | panel and table borders; form controls |
-| `--tb-text` / `--tb-text-2` / `--tb-text-muted` | `#202124` / `#3c4043` / `#5f6368` | body text; secondary text (5.7:1 on the surface) |
-| `--tb-primary` / `--tb-primary-hover` | `#1a73e8` / `#1765cc` | primary buttons, customer bubble, active tab line (white text 4.5:1) |
-| `--tb-primary-text` / `--tb-primary-weak` / `--tb-primary-strong` | `#1967d2` / `#e8f0fe` / `#174ea6` | links and blue text; selected nav, citation chips; blue text on the weak blue |
-| `--tb-ok`, `--tb-warn`, `--tb-danger`, `--tb-info` (+ `-weak`) | green, amber, red, blue pairs | status chips and banners, each pair ≥ 4.5:1 |
+| `--tb-shell` / `--tb-bg` | `#f8fafd` / `#ffffff` | app frame (top bar, nav rail, public pages) / content sheet, panels, inputs |
+| `--tb-surface` / `--tb-surface-hover` | `#f8fafd` / `#f0f4f9` | row hover, grey boxes / hover of nav items and tabs, neutral chips |
+| `--tb-line` / `--tb-line-strong` | `#e1e3e1` / `#c4c7c5` | dividers, panel borders / table head line, outlined buttons, form controls |
+| `--tb-text` / `--tb-text-2` / `--tb-text-muted` | `#1f1f1f` / `#444746` / `#5e6368` | body text; icons and secondary text (5.8:1 on the shell) |
+| `--tb-primary` / `--tb-primary-hover` | `#0b57d0` / `#0842a0` | primary buttons, customer bubble, active tab line (white text 6.4:1) |
+| `--tb-primary-text` / `--tb-primary-weak` / `--tb-primary-strong` | `#0b57d0` / `#d3e3fd` / `#041e49` | links and blue text; selected nav item, citation chips; text on the weak blue |
+| `--tb-ok`, `--tb-warn`, `--tb-danger`, `--tb-info` (+ `-weak`) | green, amber, red, blue pairs | statuses and banners, each pair ≥ 4.5:1 |
 | `--tb-space` | 8px | spacing grid: Tailwind steps 2, 4, 6, 8 …; step 1 (4px) only inside chips |
-| `--tb-radius` / `--tb-radius-sm` | 8px / 4px | panels, buttons, cards / form controls; chips are pills |
-| `--tb-row-height` | 48px | queue table rows |
+| `--tb-radius` / `--tb-radius-sm` / `--tb-radius-sheet` | 8px / 4px / 16px | panels, cards / form controls, tags / the content sheet; buttons are pills |
+| `--tb-row-height` | 44px | queue table rows |
 
-- **Classes.** Semantic colours: `bg-surface`, `bg-surface-hover`, `border-line`, `text-ink`, `text-muted`, `bg-primary`, `text-primary-text`, `bg-primary-weak`. Components: `btn` + `btn-primary` (one per area) / `btn-secondary` / `btn-danger`; `chip` + `chip-info` / `chip-ok` / `chip-warn` / `chip-danger` (always with a word, never colour alone); `field` (36px form control); `panel` (white box with a 1px border). The older `slate`, `red`, `amber`, `sky`, `emerald` and `brand` classes are mapped onto the tokens, so a page that still uses them follows the same look.
-- **Type.** Roboto (variable, `@fontsource-variable/roboto`, OFL), self-hosted by the build because the CSP allows fonts only from `'self'`. Body 14px; page titles 22px regular; panel titles 16px medium.
+- **Classes.** Semantic colours: `bg-shell`, `bg-surface`, `bg-surface-hover`, `border-line`, `text-ink`, `text-muted`, `bg-primary`, `text-primary-text`, `bg-primary-weak`, `text-primary-strong`. Components: `btn` + `btn-primary` (one per area) / `btn-secondary` (outlined) / `btn-danger`; `btn-icon` (40px round icon button); `chip` + `chip-info` / `chip-ok` / `chip-warn` / `chip-danger` (4px tags, always with a word); `field` (32px form control); `panel` (white box, 1px border); `data-table` (open table: dark header row over a strong line, rows divided by light lines, hover). The older `slate`, `red`, `amber`, `sky`, `emerald` and `brand` classes are mapped onto the tokens, so a page that still uses them follows the same look.
+- **Statuses** are an icon plus a word (urgent: flag + "Urgent"; over SLA: error icon + time + "over SLA"); colour is never the only signal.
+- **Type.** Roboto (variable, `@fontsource-variable/roboto`, OFL), self-hosted by the build because the CSP allows fonts only from `'self'`. Body 14px; page titles and the wordmark 22px regular; panel titles 16px medium.
 - **Icons.** Material Symbols, outlined, weight 400 (Apache-2.0), only in navigation, status and actions. The path data of the icons in use is generated into `src/components/icons.generated.ts` from the pinned `@material-symbols/svg-400` by `node scripts/icons.mjs`; `<Icon>` draws it inline in the text colour and hides it from screen readers (the text next to it carries the meaning).
 - **Logo.** An original mark (two tally strokes under a bridge arch in a blue rounded square) with the wordmark "Tallybridge" (`src/components/Logo.tsx`); the same mark is `public/favicon.svg`.
-- **Demo marker.** The header shows a small "DEMO" badge whose tooltip and screen-reader text say "Demo · fictional company"; the public pages' footer says once that Tallybridge is a fictional company and the data is made up.
-- **Layouts.** Console: top bar (logo, badge, operator, log out) and a left navigation rail with icons (a horizontal strip under 768px). Public pages: top bar, content on the grey surface, footer. Login: a centred card with the mark.
+- **Demo marker.** The top bar shows a small "DEMO" pill whose tooltip and screen-reader text say "Demo · fictional company"; the public pages' footer says once that Tallybridge is a fictional company and the data is made up.
+- **Layouts.** Console: top bar (logo, badge, operator with initial avatar, log out); left rail with the area title "Support console" and pill navigation items (a horizontal strip under 768px); pages left-aligned on the white sheet with a 48px title row (ticket: back arrow, title, status, actions on the right), underline tabs, a filter bar above tables. Public pages: shell background, white panels, footer. Login: a centred card with the mark.

@@ -89,8 +89,11 @@ export function TicketPage() {
   );
 
   return (
-    <div className="mx-auto max-w-[96rem] px-4 py-6 sm:px-6">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="px-4 py-4 sm:px-6">
+      <div className="flex min-h-12 flex-wrap items-center gap-3">
+        <Link to="/console" aria-label="Back to the queue" className="btn-icon -ml-2">
+          <Icon name="arrow_back" />
+        </Link>
         <h1 className="text-[1.375rem] font-normal">
           {data.customer.display_name} · {words(data.intent)}
         </h1>
@@ -120,7 +123,7 @@ export function TicketPage() {
           )}
         </div>
       </div>
-      <p className="mt-2 text-xs text-muted">Shortcuts: A approve · E edit · R reject · J / K next / previous ticket</p>
+      <p className="mt-1 pl-10 text-xs text-muted">Shortcuts: A approve · E edit · R reject · J / K next / previous ticket</p>
 
       {t.stale && (
         <div role="alert" className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-amber-400 bg-amber-50 p-3 text-amber-950">
@@ -138,7 +141,7 @@ export function TicketPage() {
         </p>
       )}
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
+      <div className="mt-4 grid gap-4 border-t border-line pt-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
         <Conversation ticket={data} />
         <div className="space-y-4">
           <section aria-labelledby="why-heading" className="panel p-4">
