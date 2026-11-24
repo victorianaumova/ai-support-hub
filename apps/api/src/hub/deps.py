@@ -29,6 +29,7 @@ from hub.observability.readiness import (
     qdrant_check,
 )
 from hub.observability.tracing import Tracer
+from hub.tools.cloud_identity import IdentityToken
 from hub.tools.mcp_client import DbToolCallRecorder, McpTransport, ToolClient
 
 
@@ -60,15 +61,19 @@ class Container:
         return OperatorSessionSigner(secret) if secret else None
 
 
+def identity_token(settings: Settings) -> IdentityToken | None:
+    """The Cloud Run ID token for the MCP service, when `MCP_SERVER_AUDIENCE` is set (P10-07)."""
+    return IdentityToken(settings.mcp_server_audience) if settings.mcp_server_audience else None
+
+
 def tool_client(
     settings: Settings, database: Database, tracer: Tracer | None = None
 ) -> ToolClient | None:
     token = settings.mcp_server_token.get_secret_value()
     if not token:
         return None
-    return ToolClient(
-        McpTransport(settings.mcp_server_url, token), DbToolCallRecorder(database), tracer=tracer
-    )
+    transport = McpTransport(settings.mcp_server_url, token, identity_token(settings))
+    return ToolClient(transport, DbToolCallRecorder(database), tracer=tracer)
 
 
 def build_pipeline(
@@ -111,6 +116,8 @@ def build_container(settings: Settings) -> Container:
     # The search embeds its query through the same gateway the pipeline uses.
     pipeline = dataclasses.replace(pipeline, retriever=kb.retriever)
 
+    identity = identity_token(settings)
+
     async def counts() -> tuple[int, int]:
         return await index_counts(database, kb.index)
 
@@ -121,8 +128,12 @@ def build_container(settings: Settings) -> Container:
         kb=kb,
         readiness_checks={
             "postgres": postgres_check(settings.database_url.get_secret_value()),
-            "qdrant": qdrant_check(settings.qdrant_url),
+            "qdrant": qdrant_check(kb.index.collection),
             "kb_index": kb_index_check(counts),
-            "mcp": mcp_check(settings.mcp_server_url, settings.mcp_server_token.get_secret_value()),
+            "mcp": mcp_check(
+                settings.mcp_server_url,
+                settings.mcp_server_token.get_secret_value(),
+                extra_headers=identity.headers if identity is not None else None,
+            ),
         },
     )

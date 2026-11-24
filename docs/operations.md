@@ -14,7 +14,7 @@ Build state: the services arrive with their phases. Phase 2 has `postgres`, `qdr
 | `make models` | download the local embedding model and the BM25 files into `EMBEDDING_CACHE_DIR` (needs the network once) and check the model file against its pinned SHA-256 (`hub/llm/local_embedding.py`) |
 | `make up` / `make down` | start / stop the compose stack |
 | `make migrate` | Alembic upgrade of the app database, then of the evaluation database (`-x db=eval`, migrator `EVAL_DATABASE_URL_DIRECT`; skipped when `EVAL_DATABASE_URL` is empty, refused when it names the app database; P4-03) , including the LangGraph checkpoint tables (migration 0009, P6-01) |
-| `make seed` | load demo customers, operators, settings (idempotent: customers are upserted by `external_ref`, except anonymised ones; operators and settings are inserted only when missing) |
+| `make seed` | load demo customers, operators, settings (idempotent: customers are upserted by `external_ref`, except anonymised ones; operators and settings are inserted only when missing). `uv run python -m hub.seed data/seed --reset-operator-passwords` sets the demo operators' passwords back to `SEED_OPERATOR_PASSWORD` (ends their sessions, lifts a lockout, audited); on Cloud Run: run `deploy` by hand with *reset operator passwords* ticked |
 | `make kb-load` | load `data/kb` into Postgres (only changed documents), then sync the Qdrant index with Postgres: only chunks whose text changed are embedded again (`hub/kb/service.py`, P5-01). `FULL=1` also re-chunks unchanged files (writes only those whose chunks differ), builds a new collection and moves the alias `kb_chunks` to it |
 | `make dev` | `models` + `up` + `migrate` + `seed` + `kb-load` |
 | `make mcp` | run the support-tools MCP server over stdio (what Claude Code starts; see the README) |
@@ -34,7 +34,7 @@ Build state: the services arrive with their phases. Phase 2 has `postgres`, `qdr
 | `make eval-report RUN=<id> BASE=<id>` | compare two evaluation runs; see [eval plan](eval-plan.md) |
 | `make leak-scan` | scan database, logs and recorded model requests for card patterns and canary strings |
 | `make export-review-candidates` | export rejected and heavily edited drafts as candidates for new eval tickets |
-| `make rollback` | send traffic back to the previous deployed revision |
+| `make rollback` | send `hub-api`'s traffic back to the revision before the current one (`infra/deploy/rollback.sh`; needs gcloud, `GCP_PROJECT_ID`, `GCP_REGION`) |
 
 **Fake model provider.** `LLM_MODE=fake` makes the gateway return deterministic recorded or scripted responses for chat calls. Embeddings always come from the local model, in both modes (free, offline, deterministic; P5-01). Unit, integration and e2e tests run with it, so tests need no API key and cost nothing. Recordings live in `apps/api/tests/fixtures/llm/` and are refreshed with `make record-llm` (real calls). The compose `api` service mounts them read-only where the gateway looks (`FIXTURES_DIR`), with `config/` and `prompts/` (the app loads both at start), so `make dev` runs in fake mode; a ticket whose text has no recording is handed to a human (`system_error`). Only the run tickets have recordings; use `LLM_MODE=real` for other texts.
 
@@ -61,6 +61,7 @@ All settings are environment variables read by one Pydantic `Settings` class (`h
 | `PROMPTS_DIR` | `prompts` | prompt files; the active versions are in `MODELS_CONFIG` |
 | `POLICY_CONFIG` | `config/policy.yaml` | routing rules, notice texts, support hours ([AI pipeline](ai-pipeline.md) §6); a broken file stops the start |
 | `CONFIDENCE_CONFIG` | `config/confidence.json` | rule version of confidence (AI pipeline §6) |
+| `MCP_SERVER_AUDIENCE` | empty | Cloud Run only: the `support-tools` service URL; the API then adds a Google ID token for it (P10-07) |
 | `MCP_SERVER_URL`, `MCP_SERVER_TOKEN` | `http://mcp:8001/mcp` | the token is required: the server's HTTP transport refuses to start without one, and refuses every request without it (401) |
 | `JIRA_MODE`, `SLACK_MODE` | `mock` | only `mock` ([ADR-0019](adr/0019-scope-cuts.md)); the real-mode settings were removed in P7-02, and an old `.env` line such as `JIRA_API_TOKEN=` now stops the start (unknown variable) |
 | `SESSION_SECRET` | random 32 bytes | |
@@ -70,7 +71,7 @@ All settings are environment variables read by one Pydantic `Settings` class (`h
 | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` | | tracing is off while either key is empty (no client, no network); an empty host means Langfuse Cloud EU |
 | `LANGFUSE_PROJECT_ID` | | only for the console's trace link; empty: the Run tab shows the bare trace id |
 | `DAILY_BUDGET_USD` | `0.20` | start value of the setting (the production guard, §6) |
-| `AUTO_REPLY_ALLOWED` | `false` | deployment lock on auto-reply ([ADR-0019](adr/0019-scope-cuts.md), [security](security.md) §3 G5): while false a lead cannot switch auto-reply on and the graph sends every draft to an operator |
+| `AUTO_REPLY_ALLOWED` | `false` | deployment lock on auto-reply ([ADR-0019](adr/0019-scope-cuts.md), [security](security.md) §3 G5): while false a lead cannot switch auto-reply on and the graph sends every draft to an operator; the demo deploy sets it to `true` (§6) |
 | `EVAL_MAX_COST_USD` | `1.00` | hard stop for one evaluation run |
 | `EVAL_TRACE_SAMPLE` | `0.2` | share of evaluation runs sent to Langfuse, chosen by a stable hash of the run id |
 | `EVAL_RUNS_DIR` | `evals/runs` | committed evaluation runs; `GET /console/evals/latest` reads the newest clean real-model run here (the API image must contain the folder, P10-06) |
@@ -116,7 +117,8 @@ Trace attributes on every run: `run_id`, `ticket_id` (also the Langfuse session,
 | Workflow | Trigger | Jobs |
 |---|---|---|
 | `ci.yml` | pull request, push to main | `lint` (ruff, mypy, import-linter, eslint, tsc; installs Node and the web dependencies) · `test` (unit tests, coverage gate for safety modules) · `test-int` (integration with testcontainers; builds the api dev image) · `web` (`make web-types` must leave `schema.d.ts` unchanged, Vitest, production build) · `e2e` (`make test-e2e`: compose + Playwright + axe, fake models; the report is uploaded on failure) · `security` (gitleaks over the whole history, pip-audit over the locked and hashed requirements, pnpm audit at level `high`) · `data-check` · `hook-bootstrap` (informational, not required: the gitleaks pre-commit hook installs on a machine without Go) |
-| `deploy.yml` | push to main after `ci` is green; manual | build images → push → migrate → deploy → smoke check |
+| `deploy.yml` | after `ci` is green on main; manual | build images → push → migrate (Neon, as the owner) → deploy `support-tools` and `hub-api` → seed and KB load (idempotent) → smoke check (`/ready` + canary ticket) → roll back on failure. Skipped while `GCP_PROJECT_ID` is not set (before H8) |
+| `jobs.yml` | hourly, nightly, every 3 days; manual | `close-stale` + `recover-runs`, `retention`, `ping` through `POST /admin/jobs/{name}`; skipped while `DEMO_URL` is not set |
 
 **Dependency updates (P8-06, security T11).** Dependabot (`.github/dependabot.yml`) checks weekly for the uv workspace (`uv.lock`), GitHub Actions, the web app (`npm`, which covers pnpm) and the dev images' base images (`infra/`), with a 7-day cooldown on version updates (security updates come at once). Each update is a normal pull request. Patch and minor updates are auto-merged (`.github/workflows/dependabot-automerge.yml`, `gh pr merge --auto --squash`) once the checks the `main` ruleset requires are green (lint, test, test-int, data-check, security); majors wait for the owner. Frozen, because they change model or retrieval behaviour: `litellm`, `langchain*`, `langgraph*`, `fastembed`, `onnxruntime`, `qdrant-client` are ignored by Dependabot and never auto-merged; updating one is a task with an eval run. The gitleaks pre-commit hook builds with a pinned Go (`language_version` in `.pre-commit-config.yaml`, at least the `go` line of gitleaks' `go.mod`); pre-commit downloads exactly that toolchain, also on machines that have Go, and updates it only when someone changes the pin.
 
@@ -130,25 +132,27 @@ Decision and alternatives: [ADR-0015](adr/0015-free-tier-deployment.md).
 
 ```mermaid
 flowchart LR
-    user([Browser]) --> run_api["Cloud Run: hub-api<br/>API + built web app<br/>scales to zero"]
-    run_api --> run_mcp["Cloud Run: support-tools<br/>MCP server, internal"]
+    user([Browser]) --> run_api["Cloud Run: hub-api<br/>API + built web app<br/>scales to zero, max 1 instance"]
+    run_api -- "ID token + bearer token" --> run_mcp["Cloud Run: support-tools<br/>MCP server, authentication required"]
     run_api --> neon[("Neon Postgres<br/>free plan")]
     run_api --> qcloud[("Qdrant Cloud<br/>free cluster")]
-    run_api --> llm[(LLM providers)]
-    run_api --> lf[(Langfuse Cloud<br/>free plan)]
-    gha["GitHub Actions"] -- "build, migrate, deploy" --> run_api
+    run_api --> llm[(Anthropic API)]
+    gha["GitHub Actions"] -- "build, migrate, deploy, smoke" --> run_api
     gha --> run_mcp
+    gha -- "scheduled jobs" --> run_api
 ```
 
-| Part | Service | Cost | Note |
+Limits checked on **2026-11-23** on the providers' pages (P10-07; free tiers change, check again before relying on them):
+
+| Part | Service | Free allowance (checked 2026-11-23) | Note |
 |---|---|---|---|
-| API + web | Google Cloud Run, 1 service, min instances 0, max 2, 1 vCPU / 1 GiB, request-based billing | inside the always-free allowance for demo traffic | Needs a billing account with a card. A budget alert at €1 is set. Cold start a few seconds — acceptable for a demo; the README says so. |
-| MCP server | Cloud Run, second service, min 0 | free | "Require authentication" is on: only the service account of `hub-api` has the invoker role. The bearer token is a second check. |
-| Postgres | Neon free plan | free | Checked 2026-11: 100 compute-hours per month, about 1 GB storage, the database sleeps after 5 minutes without queries (first query after that is slow). Pooled connection string for the app — the builder checks that psycopg prepared statements and the LangGraph checkpointer work through the pooler; direct connection for migrations. |
-| Vector search | Qdrant Cloud free cluster (1 GB RAM) | free | Checked 2026-11: a free cluster is suspended after 1 week without use and deleted after 4 weeks. A scheduled GitHub Action calls the `ping` job every 3 days. If the cluster is lost, `make kb-load` rebuilds it in minutes. |
-| Tracing | Langfuse Cloud free plan | free | Checked 2026-11: 50,000 units per month, 30 days of data. Full evaluation runs can use this up — tracing of eval runs is sampled (`EVAL_TRACE_SAMPLE`, default 0.2). |
-| Images | Artifact Registry or GitHub Container Registry | free at this size | |
-| Model calls | Anthropic API (the only provider, ADR-0018) | pay per use | The only real cost. About $5 for the whole project. **Production daily budget guard: $0.20** (owner decision, 2026-11-23): `DAILY_BUDGET_USD` defaults to 0.20 in the code and in `.env.example` (owner decision, P10-02), and the seeded `daily_budget_usd` setting starts at that value; a lead may lower it in the console. Embeddings run inside the API container (the image contains the model). |
+| API + web | Google Cloud Run `hub-api`, min instances 0, **max 1**, 1 vCPU / 1 GiB, request-based billing, concurrency 20 | 180,000 vCPU-seconds, 360,000 GiB-seconds and 2 million requests per month, per billing account (Tier 1 regions; [Cloud Run pricing](https://cloud.google.com/run/pricing)) | Needs a billing account with a card and a budget alert at €1. Cold start a few seconds; the README says so. **Max 1 instance** (decision P10-07): the rate limiter counts in process memory (`hub/api/limits.py`), so one instance keeps the limits of API §1 exact; a shared limiter in Postgres is not needed at demo traffic. uvicorn runs with `--proxy-headers` and `FORWARDED_ALLOW_IPS=*` (only Google's front end reaches the container), so the per-IP limits key on the real client. |
+| MCP server | Cloud Run `support-tools`, min 0, max 1, 512 MiB | same allowance | "Require authentication" is on: only the `hub-api` service account has the invoker role. The API sends a Google ID token from the metadata server in `X-Serverless-Authorization` (`MCP_SERVER_AUDIENCE`, `hub/tools/cloud_identity.py`) and the MCP bearer token in `Authorization` as the second check. |
+| Postgres | Neon free plan | 100 CU-hours per project per month, 1 GB storage per project, 5 GB egress per project, autoscaling up to 2 CU, scale to zero after 5 minutes without queries (cannot be turned off); over the limit, compute is suspended until the next month ([Neon plans](https://neon.com/docs/introduction/plans)) | Pooled connection string for the app (`database-url`), direct one for migrations (`NEON_OWNER_URL`). The first query after a pause is slow. |
+| Vector search | Qdrant Cloud free cluster | 1 node, 1 GB RAM, 0.5 vCPU, 4 GB disk; suspended after 1 week without use, deleted after 4 weeks ([Qdrant Cloud](https://qdrant.tech/documentation/cloud/create-cluster/)) | `jobs.yml` calls the `ping` job every 3 days. If the cluster is lost, the deploy workflow's KB load (or `make kb-load`) rebuilds it in minutes. |
+| Tracing | Langfuse Cloud Hobby plan (optional, P9-01, ADR-0021) | 50,000 units per month, 30 days of data access, 2 users, ingestion 1,000 requests/min ([Langfuse pricing](https://langfuse.com/pricing)) | The demo runs without it: the deploy passes the keys only when `LANGFUSE_ENABLED` is `true`. Full evaluation runs can use the units up, so eval runs are sampled (`EVAL_TRACE_SAMPLE`, default 0.2). |
+| Images | Artifact Registry (`<region>-docker.pkg.dev/<project>/support-hub`) | 0.5 GB storage free per billing account (not re-confirmed on 2026-11-23: the page renders its table with JavaScript; [Artifact Registry pricing](https://cloud.google.com/artifact-registry/pricing)) | Old images can be deleted by a cleanup policy. |
+| Model calls | Anthropic API (the only provider, ADR-0018) | pay per use | The only real cost. About $5 for the whole project. **Production daily budget guard: $0.20** (owner decision, 2026-11-23): the deployment sets `DAILY_BUDGET_USD=0.20`, it defaults to 0.20 in the code and in `.env.example` (owner decision, P10-02), and the seeded `daily_budget_usd` setting starts at that value; a lead may lower it in the console. Embeddings run inside the API container (the image contains the model). |
 
 Free tiers change. **Before phase 10 the builder checks the current limits on the official pricing pages and updates this table.** Everything runs in standard containers with standard Postgres and Qdrant, so the fallback is simple: one small VPS with the same `docker-compose.yml` plus Caddy for HTTPS (`infra/compose.prod.yml` is kept working for this).
 
@@ -157,9 +161,22 @@ Deployment rules:
 - VPS fallback: `docker compose --env-file .env -f infra/compose.prod.yml up --build` (from the repo root) runs Postgres, Qdrant, the MCP server, a one-shot `setup` (migrations, seed, KB load) and the API behind Caddy (`infra/Caddyfile`). `--env-file` is required: compose fills the `${...}` values in the file (database password, budget, ports) only from the shell or that file, not from `env_file:`. Only Caddy publishes ports: `HTTP_PORT` (default 8080) and `HTTPS_PORT` (default 8443). Without `SITE_ADDRESS` it serves plain HTTP on `HTTP_PORT` (local check). For a real domain set `SITE_ADDRESS` to the domain, `HTTP_PORT=80` and `HTTPS_PORT=443`, and point DNS at the host; Caddy needs both ports to get the certificate and redirect HTTP to HTTPS. `DAILY_BUDGET_USD` defaults to 0.20 there. The app role `hub_api` keeps the init script's password until P10-07 sets it from a secret.
 - Secrets in Google Secret Manager (or Cloud Run secrets), never in the image or the repository.
 - Migrations run as a separate step before the new revision gets traffic. Migrations must be backward compatible with the running version.
-- After deploy: smoke check — `/ready`, then one fixed canary ticket through the real pipeline (cost under one cent). A failed check triggers the rollback.
-- Rollback: previous Cloud Run revision gets the traffic again (`make rollback`).
+- **Auto-reply unlocked on the demo** (owner decision, 2026-11-24, [ADR-0022](adr/0022-auto-reply-on-in-the-demo.md)): `deploy.yml` sets `AUTO_REPLY_ALLOWED=true` for `hub-api` (the default in code, images and `.env.example` stays `false`). This only lifts the deployment lock (security §3 G5): auto-reply still starts off (the seeded `auto_reply_enabled` is `false`, the threshold 0.95) until a lead switches it on in the console, and the routing rules of AI pipeline §6 still hand every risky ticket (policy topics, restricted accounts, failed checks, injection, low confidence) to a human. `support-tools` does not read the setting.
+- After deploy: smoke check — `/ready`, then one fixed canary ticket through the real pipeline (cost under one cent; `infra/deploy/smoke.py`). A failed check triggers the rollback.
+- Rollback: previous Cloud Run revision gets the traffic again (`make rollback`, `infra/deploy/rollback.sh`; `deploy.yml` does it on its own when the smoke check fails). A rollback pins the traffic to that revision; the next deploy moves it back to the latest revision (`update-traffic --to-latest`) before the smoke check.
 - Because Cloud Run gives CPU only during a request, all work happens inside requests ([ADR-0007](adr/0007-in-request-processing-sse.md)). Scheduled work is triggered by GitHub Actions schedules that call `POST /admin/jobs/{name}` with `JOBS_TOKEN`: `close-stale` and `recover-runs` every hour, `retention` every night, `ping` every 3 days. No evaluation runs in GitHub Actions (ADR-0018).
+
+### First deployment (human gate H8, P10-07)
+
+`deploy.yml` and `jobs.yml` are skipped until the owner has done these steps (accounts, billing and secrets are the owner's; nothing here is done by an agent):
+
+1. **Google Cloud:** a project with billing and a **budget alert at €1**; enable Cloud Run, Artifact Registry, Secret Manager, IAM Credentials; create the Artifact Registry repository `support-hub` in the chosen region.
+2. **Service accounts:** `hub-api` (runtime of the API: Secret Manager accessor, `roles/run.invoker` on `support-tools` only); `support-tools` (runtime of the MCP server: Secret Manager accessor on `mcp-server-token` only; the default compute account is not used); and a deploy account for GitHub (Cloud Run admin, Artifact Registry writer, service account user on `hub-api` and `support-tools`), reached through Workload Identity Federation limited to this repository.
+3. **Neon:** a project and database; keep the owner connection string (direct) and the pooled host. Run `make migrate` once with `DATABASE_URL_DIRECT` = the owner URL (migration 0001 creates `hub_app` and the default privileges as the owner, not a superuser), then `infra/deploy/neon-app-user.sql` to create `hub_api`, then `DATABASE_URL=<hub_api URL> uv run python infra/deploy/check_roles.py` (the app user cannot `UPDATE` or `DELETE` `audit_log`).
+4. **Qdrant Cloud:** a free cluster; its URL and API key.
+5. **Secret Manager:** `database-url` (pooled, `hub_api`), `session-secret`, `demo-access-code`, `jobs-token`, `mcp-server-token`, `anthropic-api-key`, `qdrant-api-key`; optional for run traces (P9-01, ADR-0021): `langfuse-public-key`, `langfuse-secret-key`. Generate random secrets without a trailing newline: `openssl rand -hex 32 | tr -d '\n' | gcloud secrets create session-secret --data-file=-` (likewise `jobs-token`, `mcp-server-token`, `demo-access-code`; for a GitHub secret `openssl rand -hex 32 | tr -d '\n' | pbcopy`). The Hub, the MCP server, the smoke check and `jobs.yml` strip surrounding whitespace from every secret anyway.
+6. **GitHub:** environment `demo`; variables `GCP_PROJECT_ID`, `GCP_REGION`, `GCP_WIF_PROVIDER`, `GCP_DEPLOY_SERVICE_ACCOUNT`, `QDRANT_URL`, and after the first deploy `DEMO_URL`; for traces `LANGFUSE_ENABLED=true` (only once the two Langfuse secrets exist), `LANGFUSE_HOST` (empty: Langfuse Cloud EU) and `LANGFUSE_PROJECT_ID` (the console's trace link); secrets `NEON_OWNER_URL`, `QDRANT_API_KEY`, `SEED_OPERATOR_PASSWORD`, `DEMO_ACCESS_CODE`, `JOBS_TOKEN`.
+7. Run `deploy` by hand (`workflow_dispatch`), open the URL, and check `make rollback` once.
 
 ## 7. Backups
 

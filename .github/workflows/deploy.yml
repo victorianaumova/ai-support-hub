@@ -1,0 +1,152 @@
+# Deploy to Cloud Run (operations §6, ADR-0015; P10-07): build → push → migrate → deploy → smoke,
+# and roll the API back to its previous revision when the smoke check fails.
+# Runs after `ci` is green on main, or by hand. Does nothing until the owner has set up the cloud
+# accounts (human gate H8): every job is skipped while the repository variable GCP_PROJECT_ID is
+# empty. Setup checklist: docs/operations.md §6 "First deployment".
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      reset_operator_passwords:
+        description: "Set the demo operators' passwords back to SEED_OPERATOR_PASSWORD"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write # Workload Identity Federation: no service account key in GitHub
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  UV_VERSION: "0.11.8"
+  PROJECT: ${{ vars.GCP_PROJECT_ID }}
+  REGION: ${{ vars.GCP_REGION }}
+  REGISTRY: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/support-hub
+  # Tests and builds never need it; only the canary ticket of the smoke check makes a real call,
+  # inside the deployed service, which reads the key from Secret Manager.
+  ANTHROPIC_API_KEY: ""
+
+jobs:
+  deploy:
+    if: >-
+      vars.GCP_PROJECT_ID != '' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: demo
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: uv sync --all-packages --locked
+
+      - name: Build and push the images
+        env:
+          TAG: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+          docker build -f infra/Dockerfile.api --target prod -t "$REGISTRY/hub-api:$TAG" .
+          docker build -f infra/Dockerfile.mcp --target prod -t "$REGISTRY/support-tools:$TAG" .
+          docker push "$REGISTRY/hub-api:$TAG"
+          docker push "$REGISTRY/support-tools:$TAG"
+
+      - name: Remember the serving revision (for the rollback)
+        id: previous
+        run: |
+          prev="$(gcloud run services describe hub-api --project "$PROJECT" --region "$REGION" \
+            --format='value(status.traffic[0].revisionName)' 2>/dev/null || true)"
+          echo "revision=$prev" >> "$GITHUB_OUTPUT"
+
+      # Before the new revision gets traffic; migrations stay compatible with the running one.
+      - name: Migrate (Neon, as the database owner)
+        env:
+          DATABASE_URL_DIRECT: ${{ secrets.NEON_OWNER_URL }}
+          DATABASE_URL: ${{ secrets.NEON_OWNER_URL }}
+        run: uv run alembic -c infra/alembic.ini upgrade head
+
+      # Its own runtime account (owner decision on PR 68): it reads mcp-server-token and nothing
+      # else; the default compute account is not used.
+      - name: Deploy the MCP server (authentication required)
+        env:
+          TAG: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          gcloud run deploy support-tools --project "$PROJECT" --region "$REGION" \
+            --image "$REGISTRY/support-tools:$TAG" --no-allow-unauthenticated \
+            --service-account "support-tools@$PROJECT.iam.gserviceaccount.com" \
+            --min-instances 0 --max-instances 1 --cpu 1 --memory 512Mi \
+            --set-secrets MCP_SERVER_TOKEN=mcp-server-token:latest --quiet
+
+      - name: "Deploy the API (one instance at most: the rate limiter counts in memory)"
+        env:
+          TAG: ${{ github.event.workflow_run.head_sha || github.sha }}
+          QDRANT_URL: ${{ vars.QDRANT_URL }}
+          # Run traces (P9-01, ADR-0021) are optional: the two Langfuse secrets are passed only
+          # when LANGFUSE_ENABLED is true, because --set-secrets fails on a missing secret.
+          LANGFUSE_ENABLED: ${{ vars.LANGFUSE_ENABLED }}
+          LANGFUSE_HOST: ${{ vars.LANGFUSE_HOST }}
+          LANGFUSE_PROJECT_ID: ${{ vars.LANGFUSE_PROJECT_ID }}
+        run: |
+          mcp_url="$(gcloud run services describe support-tools --project "$PROJECT" \
+            --region "$REGION" --format='value(status.url)')"
+          secrets="DATABASE_URL=database-url:latest,SESSION_SECRET=session-secret:latest,DEMO_ACCESS_CODE=demo-access-code:latest,JOBS_TOKEN=jobs-token:latest,MCP_SERVER_TOKEN=mcp-server-token:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,QDRANT_API_KEY=qdrant-api-key:latest"
+          if [ "$LANGFUSE_ENABLED" = "true" ]; then
+            secrets="$secrets,LANGFUSE_PUBLIC_KEY=langfuse-public-key:latest,LANGFUSE_SECRET_KEY=langfuse-secret-key:latest"
+          fi
+          gcloud run deploy hub-api --project "$PROJECT" --region "$REGION" \
+            --image "$REGISTRY/hub-api:$TAG" --allow-unauthenticated \
+            --service-account "hub-api@$PROJECT.iam.gserviceaccount.com" \
+            --min-instances 0 --max-instances 1 --cpu 1 --memory 1Gi --concurrency 20 \
+            --set-env-vars "MCP_SERVER_URL=$mcp_url/mcp,MCP_SERVER_AUDIENCE=$mcp_url,QDRANT_URL=$QDRANT_URL,DAILY_BUDGET_USD=0.20,AUTO_REPLY_ALLOWED=true,FORWARDED_ALLOW_IPS=*,EVAL_DATABASE_URL=,LANGFUSE_HOST=$LANGFUSE_HOST,LANGFUSE_PROJECT_ID=$LANGFUSE_PROJECT_ID" \
+            --set-secrets "$secrets" \
+            --quiet
+          # A rollback pins traffic to one revision, and `gcloud run deploy` keeps a pinned split:
+          # the new revision would get no traffic and the smoke check would test the old one.
+          gcloud run services update-traffic hub-api --project "$PROJECT" --region "$REGION" \
+            --to-latest --quiet
+          echo "API_URL=$(gcloud run services describe hub-api --project "$PROJECT" --region "$REGION" --format='value(status.url)')" >> "$GITHUB_ENV"
+
+      - name: Demo data and knowledge base (idempotent)
+        env:
+          DATABASE_URL: ${{ secrets.NEON_OWNER_URL }}
+          QDRANT_URL: ${{ vars.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          SEED_OPERATOR_PASSWORD: ${{ secrets.SEED_OPERATOR_PASSWORD }}
+          DAILY_BUDGET_USD: "0.20"
+          RESET: ${{ inputs.reset_operator_passwords && '--reset-operator-passwords' || '' }}
+        run: |
+          make models
+          # shellcheck disable=SC2086 # RESET is empty or one flag
+          uv run python -m hub.seed data/seed $RESET
+          uv run python -m hub.kb.service data/kb
+
+      - name: Smoke check (/ready, then one canary ticket through the real pipeline)
+        id: smoke
+        env:
+          DEMO_ACCESS_CODE: ${{ secrets.DEMO_ACCESS_CODE }}
+        run: uv run python infra/deploy/smoke.py --url "$API_URL" --canary
+
+      - name: Roll back to the previous revision
+        if: failure() && steps.previous.outputs.revision != ''
+        env:
+          PREVIOUS: ${{ steps.previous.outputs.revision }}
+        run: |
+          gcloud run services update-traffic hub-api --project "$PROJECT" --region "$REGION" \
+            --to-revisions "$PREVIOUS=100" --quiet
+          echo "::error::deploy failed; traffic is back on $PREVIOUS"

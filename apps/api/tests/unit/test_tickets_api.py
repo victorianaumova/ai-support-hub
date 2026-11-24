@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from hub.api import tickets
 from hub.api.dependencies import current_customer, db_session
+from hub.api.limits import MAX_BODY_BYTES
 from hub.api.schemas import MessageIn, MessageOut, TicketOut, citations_for_customer
 from hub.db.models import Customer
 from hub.db.session import connect
@@ -123,7 +124,7 @@ def test_idempotency_key_must_be_a_uuid(make_client: MakeClient, headers: dict[s
 
 def test_huge_body_is_refused_with_413_and_a_request_id(make_client: MakeClient) -> None:
     response = make_client().post(
-        "/api/v1/tickets", content=b'{"message": "' + b"4" * 40_000 + b'"}', headers=KEY
+        "/api/v1/tickets", content=b'{"message": "' + b"4" * MAX_BODY_BYTES + b'"}', headers=KEY
     )
     assert response.status_code == 413
     assert response.json()["code"] == "content_too_large"

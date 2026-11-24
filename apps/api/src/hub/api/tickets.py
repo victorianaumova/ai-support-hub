@@ -246,6 +246,9 @@ def _run_stream(
 
 
 def _check_rate_limits(container: Container, customer: Customer, request: Request) -> None:
+    """Refuse a message over the limits (api.md §1). It does not count the message: a replayed
+    `Idempotency-Key` (a retry after a network drop) must not use up the budget, so the count
+    is taken by `_count_message` once the request is known to be new (P10-07)."""
     limits = container.rate_limits
     session_key, ip_key = str(customer.id), client_ip(request)
     retry_after = max(
@@ -259,8 +262,12 @@ def _check_rate_limits(container: Container, customer: Customer, request: Reques
             "Too many messages. Please wait a moment.",
             headers={"Retry-After": str(retry_after)},
         )
-    limits.messages_per_session.hit(session_key)
-    limits.messages_per_ip.hit(ip_key)
+
+
+def _count_message(container: Container, customer: Customer, request: Request) -> None:
+    limits = container.rate_limits
+    limits.messages_per_session.hit(str(customer.id))
+    limits.messages_per_ip.hit(client_ip(request))
 
 
 def _scoped_key(customer: Customer, key: uuid.UUID) -> str:
@@ -418,6 +425,7 @@ async def create_ticket(
     stored = await messages.get_by_idempotency_key(scoped_key)
     if stored is not None:
         return await _replay(session, stored, expected_ticket_id=None, masked_body=masked.text)
+    _count_message(container, customer, request)
 
     customer_id = customer.id
 
@@ -470,6 +478,7 @@ async def add_message(
         return await _replay(session, stored, expected_ticket_id=ticket.id, masked_body=masked.text)
     if ticket.status == TicketStatus.CLOSED:
         raise ProblemError(409, "ticket_closed", "This ticket is closed. Start a new one.")
+    _count_message(container, customer, request)
 
     customer_id, ticket_id = customer.id, ticket.id
 

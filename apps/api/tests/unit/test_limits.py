@@ -129,7 +129,8 @@ async def test_replay_hands_on_to_the_real_receive_after_the_body() -> None:
 
 def test_default_cap_fits_a_fully_escaped_4000_character_message() -> None:
     # 4,000 characters as \uXXXX escapes plus the JSON around them.
-    assert MAX_BODY_BYTES > 4_000 * 6 + 100
+    # 4,000 emoji as JSON-escaped surrogate pairs (12 bytes each) fit (P10-07).
+    assert MAX_BODY_BYTES > 4_000 * 12 + 100
 
 
 def test_rate_limiter_allows_the_limit_then_blocks_until_the_window_moves() -> None:

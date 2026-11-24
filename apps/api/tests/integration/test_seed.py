@@ -67,10 +67,17 @@ def seed() -> SeedData:
     return read_seed(ROOT / "data" / "seed")
 
 
-async def _load(engine: AsyncEngine, seed: SeedData, password: str = PASSWORD) -> SeedReport:
+async def _load(
+    engine: AsyncEngine, seed: SeedData, password: str = PASSWORD, *, reset: bool = False
+) -> SeedReport:
     async with AsyncSession(engine, expire_on_commit=False) as session, session.begin():
         return await load_seed(
-            session, seed, operator_password=password, daily_budget_usd=BUDGET, policy=POLICY
+            session,
+            seed,
+            operator_password=password,
+            daily_budget_usd=BUDGET,
+            policy=POLICY,
+            reset_operator_passwords=reset,
         )
 
 
@@ -202,6 +209,41 @@ async def test_existing_settings_and_passwords_are_kept(
     assert setting.value == 0.8
     assert operator is not None
     assert verify_password(operator.password_hash, PASSWORD)
+
+
+async def test_a_reset_sets_the_demo_passwords_ends_sessions_and_lifts_the_lockout(
+    engine: AsyncEngine, seed: SeedData
+) -> None:
+    # The first deploy seeded the password with a trailing newline (P10-07).
+    await _load(engine, seed, password=PASSWORD + "\n")
+    async with AsyncSession(engine) as session, session.begin():
+        locked = await session.scalar(select(Operator).limit(1))
+        assert locked is not None
+        locked.failed_logins = 5
+        locked.locked_until = datetime.now(UTC)
+    audit_before = await _count(engine, AuditLog)
+
+    report = await _load(engine, seed, reset=True)
+
+    assert report.operators_reset == len(seed.operators)
+    async with AsyncSession(engine) as session:
+        operators = list(await session.scalars(select(Operator)))
+        actions = list(
+            await session.scalars(
+                select(AuditLog.action).where(AuditLog.action == "seed.operator_password_reset")
+            )
+        )
+    assert all(verify_password(row.password_hash, PASSWORD) for row in operators)
+    assert all(row.session_version == 2 for row in operators)
+    assert all(row.failed_logins == 0 and row.locked_until is None for row in operators)
+    assert len(actions) == len(seed.operators)
+    assert await _count(engine, AuditLog) == audit_before + len(seed.operators)
+    async with AsyncSession(engine) as session:
+        assert (await verify_chain(session)).ok
+
+    again = await _load(engine, seed, reset=True)
+    assert again.operators_reset == 0
+    assert not again.changed
 
 
 async def test_an_empty_password_is_refused_and_nothing_is_written(

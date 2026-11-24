@@ -71,22 +71,46 @@ def _mcp_answered(status: int) -> bool:
     return _is_success(status) or status in _MCP_REACHABLE_STATUSES
 
 
-def qdrant_check(
-    qdrant_url: str, transport: httpx2.AsyncBaseTransport | None = None
-) -> ReadinessCheck:
-    # Qdrant's /readyz needs no API key (Qdrant docs, "Monitoring").
-    return http_check(f"{qdrant_url.rstrip('/')}/readyz", accept=_is_success, transport=transport)
+def qdrant_check(answered: Callable[[], Awaitable[object]]) -> ReadinessCheck:
+    """Qdrant answers a call of the KB client (`KbIndex.collection`: the alias lookup every
+    search needs), with the client's URL, port and API key. A plain GET /readyz was refused
+    with 403 by Qdrant Cloud on the first deploy (P10-07) while the same key served the KB."""
+
+    async def check() -> None:
+        await answered()
+        return None
+
+    return check
 
 
 def mcp_check(
-    mcp_server_url: str, token: str, transport: httpx2.AsyncBaseTransport | None = None
+    mcp_server_url: str,
+    token: str,
+    transport: httpx2.AsyncBaseTransport | None = None,
+    extra_headers: Callable[[], Awaitable[dict[str, str]]] | None = None,
 ) -> ReadinessCheck:
-    # Reachability only; the real MCP handshake is tested with the client in phase 7.
+    """Reachability only; the real MCP handshake is tested with the client in phase 7.
+    `extra_headers`: the Cloud Run ID token header (P10-07), fetched on every check."""
     # Accept: application/json, so the server never opens an SSE stream for this GET.
     headers = {"Accept": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    return http_check(mcp_server_url, accept=_mcp_answered, headers=headers, transport=transport)
+    if extra_headers is None:
+        return http_check(
+            mcp_server_url, accept=_mcp_answered, headers=headers, transport=transport
+        )
+    add_headers = extra_headers
+
+    async def check() -> None:
+        found = http_check(
+            mcp_server_url,
+            accept=_mcp_answered,
+            headers=headers | await add_headers(),
+            transport=transport,
+        )
+        await found()
+
+    return check
 
 
 def kb_index_check(counts: Callable[[], Awaitable[tuple[int, int]]]) -> ReadinessCheck:

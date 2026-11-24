@@ -194,6 +194,9 @@ def test_settings_come_from_the_environment() -> None:
         }
     )
     assert settings == ServerSettings(Path("/seed"), Path("/data/m.sqlite"), ANCHOR, "abc")
+    pasted = ServerSettings.from_env({"MCP_SERVER_TOKEN": "abc\n"})
+    # A pasted secret's trailing newline is dropped.
+    assert pasted.token == "abc"  # noqa: S105 - a test value
     defaults = ServerSettings.from_env({"CORE_ANCHOR_DATE": " "})
     assert defaults == ServerSettings(DEFAULT_SEED_DIR, DEFAULT_MOCK_DB, None, "")
 

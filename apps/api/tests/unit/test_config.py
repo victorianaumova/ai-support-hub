@@ -5,7 +5,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 from sqlalchemy.engine import make_url
 
 from hub.config import Settings, SettingsError
@@ -35,6 +35,28 @@ def test_env_example_loads_as_settings() -> None:
     settings = Settings(_env_file=ENV_EXAMPLE)
     assert settings.app_env == "local"
     assert settings.core_anchor_date is None  # `CORE_ANCHOR_DATE=` means "not set"
+
+
+def test_every_secret_loses_surrounding_whitespace(tmp_path: Path) -> None:
+    # Secrets pasted from `openssl rand ... | pbcopy` end in a newline (first deploy, P10-07).
+    names = [name for name, field in Settings.model_fields.items() if field.annotation is SecretStr]
+    assert {"mcp_server_token", "session_secret", "jobs_token", "demo_access_code"} <= set(names)
+    values = {name: f"  value-of-{name}\n" for name in names}
+    settings = Settings(_env_file=None, **values)  # type: ignore[arg-type]
+    for name in names:
+        assert getattr(settings, name).get_secret_value() == f"value-of-{name}"
+
+
+def test_a_secret_from_the_environment_loses_its_trailing_newline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MCP_SERVER_TOKEN", "abc123\n")
+    assert Settings(_env_file=None).mcp_server_token.get_secret_value() == "abc123"
+
+
+def test_other_settings_keep_their_value(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("QDRANT_URL", "http://qdrant:6333")
+    assert Settings(_env_file=None).qdrant_url == "http://qdrant:6333"
 
 
 def test_the_budget_and_the_auto_reply_lock_default_to_the_safe_side() -> None:
@@ -203,3 +225,16 @@ def test_env_example_separates_app_and_migrator_users(monkeypatch: pytest.Monkey
     assert _user(settings.database_url.get_secret_value()) == "hub_api"
     assert _user(settings.eval_database_url.get_secret_value()) == "hub_api"
     assert _user(settings.database_url_direct.get_secret_value()) == "hub"
+
+
+def test_an_empty_eval_database_url_is_treated_as_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    # deploy.yml passes `EVAL_DATABASE_URL=` to Cloud Run (P10-07 review): the demo has no
+    # evaluation database, and the empty value must mean exactly that, not a broken URL.
+    monkeypatch.delenv("EVAL_DATABASE_URL", raising=False)
+    monkeypatch.delenv("EVAL_DATABASE_URL_DIRECT", raising=False)
+    unset = Settings(_env_file=None)
+    monkeypatch.setenv("EVAL_DATABASE_URL", "")
+    empty = Settings(_env_file=None)
+    assert empty.eval_database_url.get_secret_value() == ""
+    assert empty.eval_database_url == unset.eval_database_url
+    assert empty.eval_database_url_for_migrations.get_secret_value() == ""

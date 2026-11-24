@@ -6,6 +6,7 @@ import re
 import psycopg
 import pytest
 
+from hub.kb.index import connect_qdrant
 from hub.observability.readiness import libpq_url, postgres_check, qdrant_check
 
 from ._compose import compose_config, compose_image
@@ -35,7 +36,8 @@ async def test_init_script_creates_the_eval_database(postgres_url: str) -> None:
 
 
 async def test_qdrant_check_passes_against_the_container(qdrant_url: str) -> None:
-    await qdrant_check(qdrant_url)()
+    client = connect_qdrant(qdrant_url, "")
+    await qdrant_check(client.get_aliases)()
 
 
 @pytest.mark.parametrize("service", ["postgres", "qdrant"])

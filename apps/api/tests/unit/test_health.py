@@ -130,21 +130,23 @@ def _transport(status: int, seen: list[httpx2.Request]) -> httpx2.MockTransport:
     return httpx2.MockTransport(handle)
 
 
-async def test_qdrant_check_calls_readyz() -> None:
-    seen: list[httpx2.Request] = []
-    await qdrant_check("http://qdrant:6333/", transport=_transport(200, seen))()
-    assert str(seen[0].url) == "http://qdrant:6333/readyz"
+async def test_qdrant_check_passes_when_the_kb_client_answers() -> None:
+    calls: list[str] = []
+
+    async def answered() -> str | None:
+        calls.append("collection")
+        return None  # no index yet is still an answer; kb_index reports the counts
+
+    assert await qdrant_check(answered)() is None
+    assert calls == ["collection"]
 
 
-@pytest.mark.parametrize("status", [204, 200])
-async def test_qdrant_check_accepts_2xx(status: int) -> None:
-    await qdrant_check("http://qdrant:6333", transport=_transport(status, []))()
+async def test_qdrant_check_fails_when_the_kb_client_fails() -> None:
+    async def refused() -> str | None:
+        raise RuntimeError("Unexpected Response: 403 (Forbidden)")
 
-
-@pytest.mark.parametrize("status", [301, 401, 404, 503])
-async def test_qdrant_check_fails_on_other_statuses(status: int) -> None:
-    with pytest.raises(UnexpectedStatusError, match=f"HTTP {status}"):
-        await qdrant_check("http://qdrant:6333", transport=_transport(status, []))()
+    with pytest.raises(RuntimeError, match="403"):
+        await qdrant_check(refused)()
 
 
 @pytest.mark.parametrize("status", [200, 202, 400, 405, 406])

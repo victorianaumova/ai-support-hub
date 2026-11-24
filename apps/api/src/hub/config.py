@@ -14,7 +14,7 @@ from datetime import date
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, ValidationError, field_validator
+from pydantic import Field, SecretStr, ValidationError, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
@@ -70,6 +70,8 @@ class Settings(BaseSettings):
 
     mcp_server_url: str = "http://localhost:8001/mcp"
     mcp_server_token: SecretStr = SecretStr("")
+    # Cloud Run: the MCP service URL as the audience of a Google ID token (P10-07); empty locally.
+    mcp_server_audience: str = ""
 
     # Jira and Slack are mocks inside the MCP server; there is no real mode (ADR-0019, P7-02).
     jira_mode: Literal["mock"] = "mock"
@@ -101,6 +103,16 @@ class Settings(BaseSettings):
     eval_runs_dir: Path = Path("evals/runs")
     # Share of evaluation runs that are traced (by a stable hash of the run id).
     eval_trace_sample: float = Field(default=0.2, ge=0, le=1)
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def _strip_secrets(cls, value: object, info: ValidationInfo) -> object:
+        # Secrets pasted from `openssl rand ... | pbcopy` end in a newline; in a header it breaks
+        # the request (first deploy, P10-07). No secret has meaningful surrounding whitespace.
+        field = cls.model_fields.get(info.field_name or "")
+        if field is not None and field.annotation is SecretStr and isinstance(value, str):
+            return value.strip()
+        return value
 
     @field_validator("log_level", mode="before")
     @classmethod
