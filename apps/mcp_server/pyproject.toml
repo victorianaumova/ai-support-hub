@@ -10,7 +10,7 @@ dependencies = [
     "pydantic==2.14.3",
     # A dependency of mcp (form parsing in its auth routes), pinned here only to hold it back:
     # 0.0.34 was two days old at P7-01 (releases at least a week old, design §9).
-    "python-multipart==0.0.33",
+    "python-multipart==0.0.34",
     "starlette==1.10.0",
     "tzdata==2026.6",
     "uvicorn==0.54.0",
