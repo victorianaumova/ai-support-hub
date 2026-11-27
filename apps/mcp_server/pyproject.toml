@@ -7,7 +7,7 @@ license = "MIT"
 # Must never depend on `hub`: the two apps talk only over MCP (design §8).
 dependencies = [
     "mcp==2.3.0",
-    "pydantic==2.14.3",
+    "pydantic==2.14.4",
     # A dependency of mcp (form parsing in its auth routes), pinned here only to hold it back:
     # 0.0.34 was two days old at P7-01 (releases at least a week old, design §9).
     "python-multipart==0.0.34",
