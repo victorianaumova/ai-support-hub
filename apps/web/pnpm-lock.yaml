@@ -217,8 +217,8 @@ importers:
         specifier: 10.0.1
         version: 10.0.1(eslint@10.15.0(jiti@2.7.0)(supports-color@10.2.2))
       '@material-symbols/svg-400':
-        specifier: 0.48.3
-        version: 0.48.3
+        specifier: 0.49.0
+        version: 0.49.0
       '@playwright/test':
         specifier: 1.65.1
         version: 1.65.1
@@ -477,8 +477,8 @@ packages:
   '@keyv/serialize@1.1.1':
     resolution: {integrity: sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==}
 
-  '@material-symbols/svg-400@0.48.3':
-    resolution: {integrity: sha512-Zzt/m3ITfPnQWjdVl5JwHgeWaJLETMYBRvZqs8qXn0tNO+uAuZK/SaDzWEOIxkxZPIEVJpCXpKnVfQAjHshsAQ==}
+  '@material-symbols/svg-400@0.49.0':
+    resolution: {integrity: sha512-zXwn52xxfAqmmHdhiNmuP3qqHqr/xRp7XchR38Rfujk8kdx2jg4xmv9uLobU2nYHPMnaXew8eU3KadrdZqF2sA==}
 
   '@napi-rs/wasm-runtime@1.2.6':
     resolution: {integrity: sha512-mRyDmEw9/fCDXCGfL1sbgIw/GUK0PVxRW4YwgPN61F3LQ+fSyoBFarJVzgGyhF6kRzEQZ0FejDqm4WLXSeqQmw==}
@@ -2000,7 +2000,7 @@ snapshots:
 
   '@keyv/serialize@1.1.1': {}
 
-  '@material-symbols/svg-400@0.48.3': {}
+  '@material-symbols/svg-400@0.49.0': {}
 
   '@napi-rs/wasm-runtime@1.2.6(@emnapi/core@2.0.0-beta.2)(@emnapi/runtime@2.0.0-beta.2)':
     dependencies:
