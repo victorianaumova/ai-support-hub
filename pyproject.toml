@@ -18,7 +18,7 @@ dev = [
     "pytest==9.2.0",
     "pytest-asyncio==1.5.0",
     "pytest-cov==7.1.0",
-    "ruff==0.17.5",
+    "ruff==0.17.6",
     "testcontainers==4.15.0",
     # Stubs for mypy strict. Held at 20261103: the two newer releases are under a week old.
     "types-pyyaml==6.0.12.20261113",
