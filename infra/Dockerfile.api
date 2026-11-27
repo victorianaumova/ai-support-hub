@@ -7,7 +7,7 @@
 #          non-root. No test fixtures: production runs real models (`LLM_MODE=real`).
 
 # --- web app build ------------------------------------------------------------------------------
-FROM node:24.22.2-trixie-slim AS web
+FROM node:26.13.0-trixie-slim AS web
 WORKDIR /web
 # pnpm from the `packageManager` field of package.json (corepack ships with Node 24).
 COPY apps/web/package.json apps/web/pnpm-lock.yaml apps/web/.npmrc ./
