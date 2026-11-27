@@ -10,7 +10,7 @@ dependencies = [
     # Native code of argon2-cffi. Held at 26.1.0 (2026-08-20): 26.2.0 was published hours before
     # P2-05 and had no track record yet (design §9; P2-05 review).
     "argon2-cffi-bindings==26.2.0",
-    "fastapi==0.162.7",
+    "fastapi==0.165.0",
     # Local embeddings (dense bge-small-en-v1.5 and BM25 sparse), used only in hub.llm.local_embedding
     # and hub.kb.sparse (ADR-0018). 0.9.1: 2026-10-24.
     "fastembed==0.9.1",
